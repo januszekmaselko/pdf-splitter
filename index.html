@@ -161,7 +161,7 @@
 </head>
 <body>
     <div class="container">
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v1.8.0</div>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v1.9.0</div>
         <h1>JeppSRC</h1>
         <p class="subtitle">AIP AMDT Document Splitter - ICAO Annex 15 Compliant</p>
         
@@ -340,11 +340,27 @@ ZASADY GRUPOWANIA STRON (według ICAO Annex 15):
    - **GRUPUJ WSZYSTKIE STRONY z tym samym tytułem sekcji razem!**
    - Każda strona ma nagłówek w pierwszych kilku linijkach
    - Format nagłówka: (GEN|ENR|AD) [cyfra].[cyfra]
-   - IGNORUJ sufiksy po myślniku i dalsze kropki:
-     * "GEN 0.3-4" → grupuj jako "GEN 0.3"
-     * "GEN 0.3.22" → grupuj jako "GEN 0.3"
-     * "ENR 1.3-5" → grupuj jako "ENR 1.3"
-     * "ENR 4.4" na str 10, 11, 12 → JEDNA grupa "ENR 4.4" z pages: [10,11,12]
+   
+   **KRYTYCZNE - FORMAT TYTUŁU GRUPY:**
+   - Tytuł grupy = TYLKO pierwsza część nagłówka do pierwszej kropki!
+   - "GEN 0.3" ✓
+   - "GEN 0.4" ✓ (NIE "GEN 0.4-6" ani "GEN 0.4-7"!)
+   - "ENR 3.2" ✓ (NIE "ENR 3.2-22"!)
+   
+   **IGNORUJ WSZYSTKO PO KROPCE I MYŚLNIKU:**
+   - Nagłówek "GEN 0.3-4" → grupa: "GEN 0.3"
+   - Nagłówek "GEN 0.4-6" → grupa: "GEN 0.4"
+   - Nagłówek "GEN 0.4-7" → grupa: "GEN 0.4" (ta sama grupa!)
+   - Nagłówek "ENR 1.3-5" → grupa: "ENR 1.3"
+   - Nagłówek "ENR 3.2-22" → grupa: "ENR 3.2"
+   - Nagłówek "GEN 4.1-11a" → grupa: "GEN 4.1"
+   
+   **Przykład:** 
+   - Strona 10: nagłówek "GEN 0.4-1"
+   - Strona 11: nagłówek "GEN 0.4-2"
+   - Strona 12: nagłówek "GEN 0.4-6"
+   - Strona 13: nagłówek "GEN 0.4-7"
+   - Wszystkie → JEDNA grupa "GEN 0.4" z pages: [10,11,12,13]
 
 4) SPECJALNE ZASADY DLA SEKCJI AD:
    
@@ -355,23 +371,29 @@ ZASADY GRUPOWANIA STRON (według ICAO Annex 15):
    
    b) AD 2.x i wyższe (od AD 2.1 w górę) - KRYTYCZNE ZASADY:
       - **GRUPUJ WSZYSTKIE STRONY z tym samym ICAO razem!**
-      - Format nagłówka: "AD 2.X" gdzie X to cyfra (ignoruj wszystko po spacji!)
-        * "AD 2.2" ✓
-        * "AD 2.2 50" → traktuj jako "AD 2.2" (ignoruj "50")
-        * "AD 2.2-50a" → traktuj jako "AD 2.2" (ignoruj "-50a")
+      - **KAŻDE ICAO = OSOBNA GRUPA!**
       
-      - ZNAJDŹ ICAO NA KAŻDEJ STRONIE:
-        * ICAO to 4 WIELKIE LITERY
-        * ICAO jest ZAWSZE na górze strony (w pierwszych 5 linijkach)
-        * ICAO może być w nawiasie: "(LRBC)" lub między myślnikami: "— LRBC —"
-        * ICAO ZAWSZE zaczyna się od prefiksu kraju:
-          - Rumunia → LR** (np. LRBC, LROP, LRTR, LRIA, LRBM, LRSM, LRSV, LRCL)
-          - Polska → EP** (np. EPWA, EPKK)
-        * Szukaj DOKŁADNIE kodu pasującego do prefiksu kraju!
+      **KRYTYCZNE - WYKRYWANIE ICAO:**
+      - ICAO = DOKŁADNIE 4 WIELKIE LITERY (np. LROP, LRBC, LRIA, LRSM, LRSV)
+      - ICAO NIE MOŻE być dłuższe ani krótsze niż 4 litery!
+      - ICAO ZAWSZE zaczyna się od prefiksu kraju (LR dla Rumunii, EP dla Polski)
+      - ICAO jest na górze strony (w pierwszych 5 linijkach)
+      - ICAO może być w nawiasie: "(LRBC)" lub między myślnikami: "— LRSV —"
       
-      - **Przykład: jeśli strony 50, 51, 52, 53 mają "LROP" na górze → JEDNA grupa "LROP" z pages: [50,51,52,53]**
-      - Tytuł grupy: SAMO ICAO (np. "LRBC", "EPWA")
-      - Jeśli NIE MOŻESZ znaleźć ICAO → "AD 2 UNKNOWN"
+      **BŁĘDNE ICAO (NIGDY NIE UŻYWAJ):**
+      - ❌ "SUCEAVA" (to nazwa miasta, NIE kod ICAO!)
+      - ❌ "LROP-2" (za długie)
+      - ❌ "LR" (za krótkie)
+      - ✓ "LRSV" (poprawne - 4 litery)
+      
+      **Przykład:**
+      - Strona 50: nagłówek "AD 2.12", góra "(LROP)" → grupa: "LROP"
+      - Strona 51: nagłówek "AD 2.14", góra "LROP" → grupa: "LROP" (ta sama!)
+      - Strona 52: nagłówek "AD 2.1", góra "(LRBC)" → grupa: "LRBC" (NOWA grupa!)
+      - Strona 53: nagłówek "AD 2.2", góra "LRBC" → grupa: "LRBC" (ta sama!)
+      
+      - Tytuł grupy: SAMO ICAO (np. "LRBC", "LROP")
+      - Jeśli NIE MOŻESZ znaleźć 4-literowego kodu ICAO → "AD 2 UNKNOWN"
 
 PRZYKŁADY GRUPOWANIA:
 
@@ -393,24 +415,24 @@ ZWRÓĆ WYŁĄCZNIE czysty JSON (bez markdown, bez \`\`\`):
   "total_pages": 45,
   "groups": [
     {"group_title": "FRONT PAGE", "pages": [1,2,3], "subsections": []},
-    {"group_title": "GEN 0.4", "pages": [4,5], "subsections": []},
-    {"group_title": "ENR 1.3", "pages": [6,7,8], "subsections": []},
-    {"group_title": "ENR 4.4", "pages": [9,10,11,12,13], "subsections": []},
-    {"group_title": "AD 1.1", "pages": [14], "subsections": []},
-    {"group_title": "LROP", "pages": [15,16,17,18,19,20,21], "subsections": ["AD 2.1", "AD 2.2", "AD 2.12", "AD 2.14"]},
-    {"group_title": "LRBC", "pages": [22,23,24,25,26], "subsections": ["AD 2.1", "AD 2.2", "AD 2.3", "AD 2.14"]},
-    {"group_title": "LRBM", "pages": [27,28,29], "subsections": ["AD 2.2", "AD 2.12"]}
+    {"group_title": "GEN 0.4", "pages": [4,5,6,7], "subsections": []},
+    {"group_title": "GEN 3.2", "pages": [8,9,10], "subsections": []},
+    {"group_title": "ENR 1.3", "pages": [11,12], "subsections": []},
+    {"group_title": "ENR 4.4", "pages": [13,14,15], "subsections": []},
+    {"group_title": "AD 1.1", "pages": [16], "subsections": []},
+    {"group_title": "LROP", "pages": [17,18,19,20], "subsections": ["AD 2.1", "AD 2.2", "AD 2.12"]},
+    {"group_title": "LRBC", "pages": [21,22,23], "subsections": ["AD 2.1", "AD 2.3"]},
+    {"group_title": "LRSV", "pages": [24,25], "subsections": ["AD 2.14"]}
   ]
 }
 
-KRYTYCZNE: 
-- GRUPUJ strony z tym samym tytułem RAZEM w jedną grupę!
-- Pole "pages" to lista liczb: [1,2,3,4,5] nie [1], [2], [3]!
-- Pole "subsections" to lista podsekcji dla ICAO (puste [] dla GEN/ENR/AD 0-1)
-- Każda strona należy do DOKŁADNIE JEDNEJ grupy
-- WSZYSTKIE strony dokumentu muszą być przypisane!
-- Pole "total_pages" = całkowita liczba stron w dokumencie
-- Format odpowiedzi DOKŁADNIE jak powyżej
+KRYTYCZNE PRZYPOMNIENIE:
+- Tytuł grupy GEN/ENR/AD = TYLKO do pierwszej kropki! ("GEN 0.4" NIE "GEN 0.4-6")
+- ICAO = DOKŁADNIE 4 WIELKIE LITERY! ("LRSV" NIE "SUCEAVA")
+- Każde ICAO = osobna grupa!
+- GRUPUJ strony z tym samym tytułem RAZEM!
+- Pole "pages" to lista: [1,2,3,4,5]
+- WSZYSTKIE strony muszą być przypisane!
 - Zakończ token __END__`;
 
             // Próba z retry (3 razy)
