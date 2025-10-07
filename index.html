@@ -161,7 +161,7 @@
 </head>
 <body>
     <div class="container">
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v2.1.0</div>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v2.2.0</div>
         <h1>JeppSRC</h1>
         <p class="subtitle">AIP AMDT Document Splitter - ICAO Annex 15 Compliant</p>
         
@@ -290,6 +290,7 @@
                         title: group.group_title,
                         blob: blob,
                         pages: group.pages.length,
+                        subtitle: group.title || '', // tytuł dla GEN/ENR/AD
                         subsections: group.subsections || []
                     });
                 }
@@ -542,14 +543,19 @@ KRYTYCZNE PRZYPOMNIENIE:
                 const div = document.createElement('div');
                 div.className = 'result-item';
                 
-                // Dla ICAO pokaż podsekcje
-                const subsectionsHtml = result.subsections && result.subsections.length > 0
-                    ? `<div class="result-subsections">${result.subsections.join(', ')}</div>`
-                    : `<div class="result-subsections">—</div>`;
+                // Dla ICAO pokaż podsekcje, dla GEN/ENR/AD pokaż tytuł
+                let middleColumn;
+                if (result.subsections && result.subsections.length > 0) {
+                    middleColumn = `<div class="result-subsections">${result.subsections.join(', ')}</div>`;
+                } else if (result.subtitle) {
+                    middleColumn = `<div class="result-subsections">${result.subtitle}</div>`;
+                } else {
+                    middleColumn = `<div class="result-subsections">—</div>`;
+                }
                 
                 div.innerHTML = `
                     <div class="result-title">${result.title}</div>
-                    ${subsectionsHtml}
+                    ${middleColumn}
                     <button onclick="downloadPDF(${index})">Download PDF</button>
                 `;
                 resultsDiv.appendChild(div);
