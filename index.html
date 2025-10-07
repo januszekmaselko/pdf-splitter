@@ -161,10 +161,10 @@
 </head>
 <body>
     <div class="container">
-        <h1>📄 AIP PDF Splitter</h1>
-        <p class="subtitle">Darmowe dzielenie PDF według struktury AMDT - działa lokalnie w przeglądarce</p>
+        <h1>📄 JeppSRC</h1>
+        <p class="subtitle">AIP AMDT Splitter - dzieli Amendmenty według struktury ICAO Annex 15</p>
         
-        <!-- API Key wbudowany w kod - usuń tę sekcję -->
+        <!-- API Key wbudowany w kod -->
         <input type="hidden" id="apiKey" value="AIzaSyCR8xuBmxNo6znaGmGvKBXk9rZN-wwDOkk">
 
         <div class="upload-area" id="uploadArea">
@@ -291,19 +291,81 @@
         });
 
         async function analyzeWithGemini(base64Data, apiKey) {
-            const prompt = `Jesteś „AIP AMDT Grouper". Otrzymasz PDF (AMDT Rumunii).
-Z każdej strony wykryj nagłówek pasujący do:
-/(GEN|ENR|AD)\\s+(\\d+)\\.(\\d+)(-[A-Za-z0-9]+)?/
-— ignoruj sufiks po myślniku.
+            const prompt = `Jesteś "JeppSRC AIP AMDT Analyzer". Otrzymasz PDF - dokument AMDT (Amendment) aktualizujący AIP.
 
-Zasady grupowania (Rumunia, ICAO zwykle zaczyna się od „LR"):
-1) Strona 1 = FRONT (osobny plik; NIE dodawaj 1 do innych grup).
-2) Jeśli A∈{0,1} dla GEN/ENR/AD → grupuj po „{CHAP} {A}.{B}". Przykład: „ENR 1.3-4" → „ENR 1.3".
-3) Jeśli CHAP=AD i A≥2 → grupuj po ICAO (4 DUŻE litery) znalezionym na stronie; preferuj prefiks „LR".
-   Jeśli brak na stronie → „UNKNOWN". Tytuł grupy: „AD {A} {ICAO}".
+ZASADY GRUPOWANIA STRON (według ICAO Annex 15):
 
-Zwróć WYŁĄCZNIE czysty JSON (bez markdown):
-{"doc_title":"ROMANIA AMDT 012-25","groups":[{"group_title":"GEN 0.4","pages":[2,3,4]},{"group_title":"ENR 1.3","pages":[5,6]}]}`;
+1) ROZPOZNAJ KRAJ:
+   - Nazwa kraju znajduje się w tytule dokumentu na FRONT PAGE (strona 1)
+   - Kraj może być po angielsku (np. "ROMANIA", "POLAND") lub w języku lokalnym (np. "ROMÂNIA", "POLSKA")
+   - Na podstawie kraju określ prefiks ICAO lotnisk:
+     * Rumunia/Romania/România → ICAO: LR**
+     * Polska/Poland → ICAO: EP**
+     * Niemcy/Germany/Deutschland → ICAO: ED**
+     * Francja/France → ICAO: LF**
+     * (dodaj inne kraje gdy będą potrzebne)
+
+2) FRONT PAGE:
+   - Strona 1 (i ewentualnie kolejne) = FRONT PAGE (osobny plik)
+   - FRONT PAGE kończy się gdy na następnej stronie pojawi się nagłówek sekcji (GEN/ENR/AD)
+   - NIE dodawaj stron FRONT PAGE do innych grup
+
+3) GŁÓWNE SEKCJE (GEN, ENR, AD):
+   - Każda strona ma nagłówek w pierwszych kilku linijkach
+   - Format nagłówka: (GEN|ENR|AD) [cyfra].[cyfra] (np. "GEN 0.4", "ENR 1.3", "AD 2.15")
+   - IGNORUJ sufiksy po myślniku i dalsze kropki:
+     * "GEN 0.3-4" → grupuj jako "GEN 0.3"
+     * "GEN 0.3.22" → grupuj jako "GEN 0.3"
+     * "ENR 1.3-5" → grupuj jako "ENR 1.3"
+
+4) SPECJALNE ZASADY DLA SEKCJI AD:
+   
+   a) AD 0.x do AD 1.x (np. AD 0.6, AD 1.1, AD 1.5):
+      - Grupuj NORMALNIE po podsekcji (jak GEN/ENR)
+      - Tytuł: "AD 0.6", "AD 1.5" itd.
+      - Te sekcje dotyczą całego kraju, nie konkretnego lotniska
+   
+   b) AD 2.x i wyższe (od AD 2.1 w górę):
+      - Grupuj PO ICAO lotniska (4 WIELKIE litery)
+      - ICAO to kod lotniska - znajdź go w treści strony
+      - Preferuj ICAO zaczynające się od prefiksu kraju (wykrytego z FRONT PAGE)
+      - Tytuł grupy: "AD 2 [ICAO]" (np. "AD 2 LROP", "AD 2 EPWA")
+      - Jeśli brak ICAO na stronie → "AD 2 UNKNOWN"
+
+PRZYKŁADY GRUPOWANIA:
+
+Rumunia AMDT (tytuł: "ROMANIA AMDT 012/25"):
+- Strona 1 → grupa: "FRONT PAGE", pages: [1]
+- Strony 2-4 nagłówek "GEN 0.4" → grupa: "GEN 0.4", pages: [2,3,4]
+- Strony 5-6 nagłówek "ENR 1.3-5" → grupa: "ENR 1.3", pages: [5,6]
+- Strona 7 nagłówek "AD 1.1" → grupa: "AD 1.1", pages: [7]
+- Strony 8-10 nagłówek "AD 2.12" + ICAO "LROP" w treści → grupa: "AD 2 LROP", pages: [8,9,10]
+- Strony 11-12 nagłówek "AD 2.15" + ICAO "LRTR" → grupa: "AD 2 LRTR", pages: [11,12]
+
+Polska AMDT (tytuł: "POLSKA AMDT 005/25"):
+- Strona 1 → "FRONT PAGE", pages: [1]
+- Strony 2-3 "GEN 2.1.3" → grupa: "GEN 2.1", pages: [2,3]
+- Strony 4-6 "AD 2.12" + ICAO "EPWA" → grupa: "AD 2 EPWA", pages: [4,5,6]
+
+ZWRÓĆ WYŁĄCZNIE czysty JSON (bez markdown, bez \`\`\`):
+{
+  "doc_title": "ROMANIA AMDT 012/25",
+  "country": "ROMANIA",
+  "groups": [
+    {"group_title": "FRONT PAGE", "pages": [1]},
+    {"group_title": "GEN 0.4", "pages": [2,3,4]},
+    {"group_title": "ENR 1.3", "pages": [5,6]},
+    {"group_title": "AD 1.1", "pages": [7]},
+    {"group_title": "AD 2 LROP", "pages": [8,9,10]},
+    {"group_title": "AD 2 LRTR", "pages": [11,12]}
+  ]
+}
+
+KRYTYCZNE: 
+- Pole "pages" zawiera TYLKO liczby całkowite
+- Każda strona należy do DOKŁADNIE JEDNEJ grupy
+- Format odpowiedzi DOKŁADNIE jak powyżej
+- Zakończ token __END__`;
 
             // Próba z retry (3 razy)
             for (let attempt = 1; attempt <= 3; attempt++) {
@@ -327,7 +389,7 @@ Zwróć WYŁĄCZNIE czysty JSON (bez markdown):
                             }],
                             generationConfig: {
                                 temperature: 0.1,
-                                maxOutputTokens: 3000
+                                maxOutputTokens: 4000
                             }
                         })
                     });
@@ -339,7 +401,7 @@ Zwróć WYŁĄCZNIE czysty JSON (bez markdown):
                         // Jeśli overloaded, czekaj i próbuj ponownie
                         if (errorMsg.includes('overloaded') && attempt < 3) {
                             showStatus('info', `Model przeciążony, ponawiam próbę ${attempt}/3...`);
-                            await new Promise(resolve => setTimeout(resolve, 3000)); // czekaj 3 sekundy
+                            await new Promise(resolve => setTimeout(resolve, 3000));
                             continue;
                         }
                         
@@ -349,8 +411,12 @@ Zwróć WYŁĄCZNIE czysty JSON (bez markdown):
                     const data = await response.json();
                     const text = data.candidates[0].content.parts[0].text;
                     
+                    // Utnij po __END__ jeśli jest
+                    const endIdx = text.indexOf('__END__');
+                    const cleanText = endIdx !== -1 ? text.slice(0, endIdx) : text;
+                    
                     // Wytnij JSON z odpowiedzi
-                    const jsonMatch = text.match(/\{[\s\S]*\}/);
+                    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
                     if (!jsonMatch) {
                         throw new Error('Gemini nie zwrócił poprawnego JSON');
                     }
@@ -359,7 +425,7 @@ Zwróć WYŁĄCZNIE czysty JSON (bez markdown):
                     return parsed.groups || [];
                     
                 } catch (error) {
-                    if (attempt === 3) throw error; // Po 3 próbach - rzuć błąd
+                    if (attempt === 3) throw error;
                     showStatus('info', `Próba ${attempt}/3 nieudana, ponawiam...`);
                     await new Promise(resolve => setTimeout(resolve, 2000));
                 }
