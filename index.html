@@ -161,7 +161,7 @@
 </head>
 <body>
     <div class="container">
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.8em; color: #999;">v1.4.0</div>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.8em; color: #999;">v1.5.0</div>
         <h1>📄 JeppSRC</h1>
         <p class="subtitle">AIP AMDT Splitter - dzieli Amendmenty według struktury ICAO Annex 15</p>
         
@@ -221,10 +221,18 @@
 
         function handleFile(file) {
             selectedFile = file;
+            
+            // Zmniejsz wysokość okienka upload
+            uploadArea.style.padding = '20px';
+            uploadArea.style.marginBottom = '20px';
             uploadArea.innerHTML = `
-                <div class="upload-icon">✅</div>
-                <h3>${file.name}</h3>
-                <p style="color: #999;">${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <div style="font-size: 1.1em; font-weight: bold;">✅ ${file.name}</div>
+                        <div style="color: #999; font-size: 0.9em;">${(file.size / 1024 / 1024).toFixed(2)} MB</div>
+                    </div>
+                    <button onclick="location.reload()" style="width: auto; padding: 8px 15px; font-size: 0.9em; background: #999;">Zmień plik</button>
+                </div>
             `;
             processBtn.disabled = false;
             processBtn.textContent = 'Rozpocznij dzielenie PDF';
@@ -326,39 +334,55 @@ ZASADY GRUPOWANIA STRON (według ICAO Annex 15):
       - Tytuł: "AD 0.6", "AD 1.5" itd.
       - Te sekcje dotyczą całego kraju, nie konkretnego lotniska
    
-   b) AD 2.x i wyższe (od AD 2.1 w górę):
-      - Grupuj PO ICAO lotniska (4 WIELKIE litery)
-      - ICAO to kod lotniska - znajdź go w treści strony
-      - Preferuj ICAO zaczynające się od prefiksu kraju (wykrytego z FRONT PAGE)
-      - Tytuł grupy: "AD 2 [ICAO]" (np. "AD 2 LROP", "AD 2 EPWA")
-      - Jeśli brak ICAO na stronie → "AD 2 UNKNOWN"
+   b) AD 2.x i wyższe (od AD 2.1 w górę) - KRYTYCZNE ZASADY:
+      - ZAWSZE grupuj PO ICAO lotniska
+      - Format nagłówka: "AD 2.X" gdzie X to cyfra (ignoruj wszystko po spacji!)
+        * "AD 2.2" ✓
+        * "AD 2.2 50" → traktuj jako "AD 2.2" (ignoruj "50")
+        * "AD 2.2-50a" → traktuj jako "AD 2.2" (ignoruj "-50a")
+      
+      - ZNAJDŹ ICAO NA KAŻDEJ STRONIE:
+        * ICAO to 4 WIELKIE LITERY
+        * ICAO jest ZAWSZE na górze strony (w pierwszych 5 linijkach)
+        * ICAO może być w nawiasie: "(LRBC)" lub między myślnikami: "— LRBC —"
+        * ICAO ZAWSZE zaczyna się od prefiksu kraju (wykrytego z FRONT PAGE):
+          - Rumunia → LR** (np. LRBC, LROP, LRTR)
+          - Polska → EP** (np. EPWA, EPKK)
+        * Szukaj DOKŁADNIE kodu pasującego do prefiksu kraju!
+      
+      - Tytuł grupy: SAMO ICAO (np. "LRBC", "EPWA", nie "AD 2 LRBC"!)
+      - Jeśli NIE MOŻESZ znaleźć ICAO → "AD 2 UNKNOWN" (ale to NIE POWINNO się zdarzyć!)
 
 PRZYKŁADY GRUPOWANIA:
 
-Rumunia AMDT (tytuł: "ROMANIA AMDT 012/25"):
+Rumunia AMDT (tytuł: "ROMANIA AMDT 012/25", prefiks ICAO: LR):
 - Strona 1 → grupa: "FRONT PAGE", pages: [1]
 - Strony 2-4 nagłówek "GEN 0.4" → grupa: "GEN 0.4", pages: [2,3,4]
 - Strony 5-6 nagłówek "ENR 1.3-5" → grupa: "ENR 1.3", pages: [5,6]
 - Strona 7 nagłówek "AD 1.1" → grupa: "AD 1.1", pages: [7]
-- Strony 8-10 nagłówek "AD 2.12" + ICAO "LROP" w treści → grupa: "AD 2 LROP", pages: [8,9,10]
-- Strony 11-12 nagłówek "AD 2.15" + ICAO "LRTR" → grupa: "AD 2 LRTR", pages: [11,12]
+- Strona 8: nagłówek "AD 2.12", góra strony "(LROP)" → grupa: "LROP", pages: [8]
+- Strona 9: nagłówek "AD 2.2 50", góra strony "LRBC" → grupa: "LRBC", pages: [9]
+- Strona 10: nagłówek "AD 2.2-50a", góra strony "(LRBC)" → grupa: "LRBC", pages: [10] (ta sama grupa co str. 9!)
+- Strony 11-12: nagłówek "AD 2.15", góra "— LRTR —" → grupa: "LRTR", pages: [11,12]
 
-Polska AMDT (tytuł: "POLSKA AMDT 005/25"):
+Polska AMDT (tytuł: "POLSKA AMDT 005/25", prefiks ICAO: EP):
 - Strona 1 → "FRONT PAGE", pages: [1]
 - Strony 2-3 "GEN 2.1.3" → grupa: "GEN 2.1", pages: [2,3]
-- Strony 4-6 "AD 2.12" + ICAO "EPWA" → grupa: "AD 2 EPWA", pages: [4,5,6]
+- Strony 4-6 "AD 2.12", góra "(EPWA)" → grupa: "EPWA", pages: [4,5,6]
 
 ZWRÓĆ WYŁĄCZNIE czysty JSON (bez markdown, bez \`\`\`):
 {
   "doc_title": "ROMANIA AMDT 012/25",
   "country": "ROMANIA",
+  "icao_prefix": "LR",
   "groups": [
     {"group_title": "FRONT PAGE", "pages": [1]},
     {"group_title": "GEN 0.4", "pages": [2,3,4]},
     {"group_title": "ENR 1.3", "pages": [5,6]},
     {"group_title": "AD 1.1", "pages": [7]},
-    {"group_title": "AD 2 LROP", "pages": [8,9,10]},
-    {"group_title": "AD 2 LRTR", "pages": [11,12]}
+    {"group_title": "LROP", "pages": [8,9]},
+    {"group_title": "LRBC", "pages": [10,11,12]},
+    {"group_title": "LRTR", "pages": [13,14]}
   ]
 }
 
