@@ -161,7 +161,7 @@
 </head>
 <body>
     <div class="container">
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v2.2.0</div>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v2.3.0</div>
         <h1>JeppSRC</h1>
         <p class="subtitle">AIP AMDT Document Splitter - ICAO Annex 15 Compliant</p>
         
@@ -265,10 +265,13 @@
                 const groups = analysisResult.groups || [];
                 const missingPages = analysisResult.missing_pages || [];
                 
-                // Ostrzeżenie o brakujących stronach
+                // Ostrzeżenie o brakujących stronach - zostaje na stałe
                 if (missingPages.length > 0) {
-                    showStatus('warning', `WARNING: ${missingPages.length} pages not assigned: ${missingPages.join(', ')}`);
-                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    const warningDiv = document.createElement('div');
+                    warningDiv.className = 'status warning';
+                    warningDiv.id = 'missing-pages-warning';
+                    warningDiv.innerHTML = `<strong>⚠ WARNING:</strong> ${missingPages.length} pages not assigned to any group: ${missingPages.join(', ')}`;
+                    statusDiv.parentNode.insertBefore(warningDiv, statusDiv);
                 }
 
                 // Krok 3: Podziel PDF lokalnie
