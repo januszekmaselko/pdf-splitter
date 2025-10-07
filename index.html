@@ -161,21 +161,20 @@
 </head>
 <body>
     <div class="container">
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.8em; color: #999;">v1.5.0</div>
-        <h1>📄 JeppSRC</h1>
-        <p class="subtitle">AIP AMDT Splitter - dzieli Amendmenty według struktury ICAO Annex 15</p>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v1.8.0</div>
+        <h1>JeppSRC</h1>
+        <p class="subtitle">AIP AMDT Document Splitter - ICAO Annex 15 Compliant</p>
         
         <!-- API Key wbudowany w kod -->
         <input type="hidden" id="apiKey" value="AIzaSyCR8xuBmxNo6znaGmGvKBXk9rZN-wwDOkk">
 
         <div class="upload-area" id="uploadArea">
-            <div class="upload-icon">📤</div>
-            <h3>Przeciągnij PDF tutaj lub kliknij, aby wybrać plik</h3>
-            <p style="color: #999; margin-top: 10px;">Obsługuje pliki PDF (AMDT Rumunii)</p>
+            <h3 style="color: #c9d1d9; font-weight: 500; margin-bottom: 10px;">Drag PDF here or click to select file</h3>
+            <p style="color: #7d8590; margin-top: 10px; font-size: 0.9em;">Supports AIP AMDT documents (PDF format)</p>
             <input type="file" id="fileInput" accept=".pdf">
         </div>
 
-        <button id="processBtn" disabled>Załaduj plik PDF, aby rozpocząć</button>
+        <button id="processBtn" disabled>Load PDF file to begin</button>
 
         <div id="status"></div>
         <div id="results" class="results"></div>
@@ -228,14 +227,14 @@
             uploadArea.innerHTML = `
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div>
-                        <div style="font-size: 1.1em; font-weight: bold;">✅ ${file.name}</div>
-                        <div style="color: #999; font-size: 0.9em;">${(file.size / 1024 / 1024).toFixed(2)} MB</div>
+                        <div style="font-size: 1em; font-weight: 500; color: #4ade80;">✓ ${file.name}</div>
+                        <div style="color: #6b7280; font-size: 0.85em; margin-top: 4px;">${(file.size / 1024 / 1024).toFixed(2)} MB</div>
                     </div>
-                    <button onclick="location.reload()" style="width: auto; padding: 8px 15px; font-size: 0.9em; background: #999;">Zmień plik</button>
+                    <button onclick="location.reload()" style="width: auto; padding: 8px 16px; font-size: 0.85em; background: #374151; text-transform: none;">Change file</button>
                 </div>
             `;
             processBtn.disabled = false;
-            processBtn.textContent = 'Rozpocznij dzielenie PDF';
+            processBtn.textContent = 'Process AMDT Document';
         }
 
         processBtn.addEventListener('click', async () => {
@@ -253,19 +252,27 @@
 
             try {
                 // Krok 1: Wczytaj PDF
-                showStatus('info', 'Wczytuję PDF...');
+                showStatus('info', 'Loading PDF document...');
                 const arrayBuffer = await selectedFile.arrayBuffer();
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
                 const totalPages = pdfDoc.getPageCount();
 
                 // Krok 2: Wyślij do Gemini
-                showStatus('info', `Analizuję strukturę PDF (${totalPages} stron) przez Gemini AI...`);
+                showStatus('info', `Analyzing document structure (${totalPages} pages)...`);
                 const base64 = await fileToBase64(selectedFile);
                 
-                const groups = await analyzeWithGemini(base64, apiKey);
+                const analysisResult = await analyzeWithGemini(base64, apiKey);
+                const groups = analysisResult.groups || [];
+                const missingPages = analysisResult.missing_pages || [];
+                
+                // Ostrzeżenie o brakujących stronach
+                if (missingPages.length > 0) {
+                    showStatus('warning', `WARNING: ${missingPages.length} pages not assigned: ${missingPages.join(', ')}`);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                }
 
                 // Krok 3: Podziel PDF lokalnie
-                showStatus('info', `Dzielę PDF na ${groups.length} plików...`);
+                showStatus('info', `Splitting document into ${groups.length} files...`);
                 const results = [];
 
                 for (const group of groups) {
@@ -282,25 +289,36 @@
                     results.push({
                         title: group.group_title,
                         blob: blob,
-                        pages: group.pages.length
+                        pages: group.pages.length,
+                        subsections: group.subsections || []
                     });
                 }
 
                 // Pokaż wyniki
-                showStatus('success', `✅ Gotowe! Podzielono na ${results.length} plików.`);
+                showStatus('success', `Complete! Document split into ${results.length} files.`);
                 displayResults(results);
 
             } catch (error) {
-                showStatus('error', '❌ Błąd: ' + error.message);
+                showStatus('error', 'Error: ' + error.message);
                 console.error(error);
             } finally {
                 processBtn.disabled = false;
-                processBtn.textContent = 'Przetwórz kolejny PDF';
+                processBtn.textContent = 'Process another document';
             }
         });
 
         async function analyzeWithGemini(base64Data, apiKey) {
             const prompt = `Jesteś "JeppSRC AIP AMDT Analyzer". Otrzymasz PDF - dokument AMDT (Amendment) aktualizujący AIP.
+
+KRYTYCZNE: WSZYSTKIE strony muszą być przypisane do jakiejś grupy! Żadna strona nie może zostać pominięta!
+
+BARDZO WAŻNE - DODATKOWE INFORMACJE DLA SEKCJI AD 2.x:
+- Dla każdej grupy ICAO (np. LROP, LRBC) musisz dodatkowo wykryć JAKIE DOKŁADNIE podsekcje AD 2.x zawiera
+- Każda podsekcja jest oznaczona razem z ICAO, np: "LRBC AD 2.1", "LROP AD 2.14"
+- Oznaczenie może być w nagłówku strony LUB w środku strony (dowolne miejsce)
+- NIE wymieniaj podsekcji AD 2.19 i wyżej (AD 2.20, AD 2.21, etc.)
+- Jeśli jakaś treść na stronie nie ma nagłówka ale powyżej/poniżej jest oznaczona sekcja, przypisz tę treść do najbliższej wcześniejszej sekcji
+- Zwróć listę podsekcji dla każdego ICAO w formacie: ["AD 2.1", "AD 2.2", "AD 2.14"]
 
 ZASADY GRUPOWANIA STRON (według ICAO Annex 15):
 
@@ -312,7 +330,6 @@ ZASADY GRUPOWANIA STRON (według ICAO Annex 15):
      * Polska/Poland → ICAO: EP**
      * Niemcy/Germany/Deutschland → ICAO: ED**
      * Francja/France → ICAO: LF**
-     * (dodaj inne kraje gdy będą potrzebne)
 
 2) FRONT PAGE:
    - Strona 1 (i ewentualnie kolejne) = FRONT PAGE (osobny plik)
@@ -320,22 +337,24 @@ ZASADY GRUPOWANIA STRON (według ICAO Annex 15):
    - NIE dodawaj stron FRONT PAGE do innych grup
 
 3) GŁÓWNE SEKCJE (GEN, ENR, AD):
+   - **GRUPUJ WSZYSTKIE STRONY z tym samym tytułem sekcji razem!**
    - Każda strona ma nagłówek w pierwszych kilku linijkach
-   - Format nagłówka: (GEN|ENR|AD) [cyfra].[cyfra] (np. "GEN 0.4", "ENR 1.3", "AD 2.15")
+   - Format nagłówka: (GEN|ENR|AD) [cyfra].[cyfra]
    - IGNORUJ sufiksy po myślniku i dalsze kropki:
      * "GEN 0.3-4" → grupuj jako "GEN 0.3"
      * "GEN 0.3.22" → grupuj jako "GEN 0.3"
      * "ENR 1.3-5" → grupuj jako "ENR 1.3"
+     * "ENR 4.4" na str 10, 11, 12 → JEDNA grupa "ENR 4.4" z pages: [10,11,12]
 
 4) SPECJALNE ZASADY DLA SEKCJI AD:
    
    a) AD 0.x do AD 1.x (np. AD 0.6, AD 1.1, AD 1.5):
       - Grupuj NORMALNIE po podsekcji (jak GEN/ENR)
+      - **WSZYSTKIE strony z "AD 0.6" → jedna grupa "AD 0.6"**
       - Tytuł: "AD 0.6", "AD 1.5" itd.
-      - Te sekcje dotyczą całego kraju, nie konkretnego lotniska
    
    b) AD 2.x i wyższe (od AD 2.1 w górę) - KRYTYCZNE ZASADY:
-      - ZAWSZE grupuj PO ICAO lotniska
+      - **GRUPUJ WSZYSTKIE STRONY z tym samym ICAO razem!**
       - Format nagłówka: "AD 2.X" gdzie X to cyfra (ignoruj wszystko po spacji!)
         * "AD 2.2" ✓
         * "AD 2.2 50" → traktuj jako "AD 2.2" (ignoruj "50")
@@ -345,50 +364,52 @@ ZASADY GRUPOWANIA STRON (według ICAO Annex 15):
         * ICAO to 4 WIELKIE LITERY
         * ICAO jest ZAWSZE na górze strony (w pierwszych 5 linijkach)
         * ICAO może być w nawiasie: "(LRBC)" lub między myślnikami: "— LRBC —"
-        * ICAO ZAWSZE zaczyna się od prefiksu kraju (wykrytego z FRONT PAGE):
-          - Rumunia → LR** (np. LRBC, LROP, LRTR)
+        * ICAO ZAWSZE zaczyna się od prefiksu kraju:
+          - Rumunia → LR** (np. LRBC, LROP, LRTR, LRIA, LRBM, LRSM, LRSV, LRCL)
           - Polska → EP** (np. EPWA, EPKK)
         * Szukaj DOKŁADNIE kodu pasującego do prefiksu kraju!
       
-      - Tytuł grupy: SAMO ICAO (np. "LRBC", "EPWA", nie "AD 2 LRBC"!)
-      - Jeśli NIE MOŻESZ znaleźć ICAO → "AD 2 UNKNOWN" (ale to NIE POWINNO się zdarzyć!)
+      - **Przykład: jeśli strony 50, 51, 52, 53 mają "LROP" na górze → JEDNA grupa "LROP" z pages: [50,51,52,53]**
+      - Tytuł grupy: SAMO ICAO (np. "LRBC", "EPWA")
+      - Jeśli NIE MOŻESZ znaleźć ICAO → "AD 2 UNKNOWN"
 
 PRZYKŁADY GRUPOWANIA:
 
 Rumunia AMDT (tytuł: "ROMANIA AMDT 012/25", prefiks ICAO: LR):
-- Strona 1 → grupa: "FRONT PAGE", pages: [1]
-- Strony 2-4 nagłówek "GEN 0.4" → grupa: "GEN 0.4", pages: [2,3,4]
-- Strony 5-6 nagłówek "ENR 1.3-5" → grupa: "ENR 1.3", pages: [5,6]
-- Strona 7 nagłówek "AD 1.1" → grupa: "AD 1.1", pages: [7]
-- Strona 8: nagłówek "AD 2.12", góra strony "(LROP)" → grupa: "LROP", pages: [8]
-- Strona 9: nagłówek "AD 2.2 50", góra strony "LRBC" → grupa: "LRBC", pages: [9]
-- Strona 10: nagłówek "AD 2.2-50a", góra strony "(LRBC)" → grupa: "LRBC", pages: [10] (ta sama grupa co str. 9!)
-- Strony 11-12: nagłówek "AD 2.15", góra "— LRTR —" → grupa: "LRTR", pages: [11,12]
-
-Polska AMDT (tytuł: "POLSKA AMDT 005/25", prefiks ICAO: EP):
-- Strona 1 → "FRONT PAGE", pages: [1]
-- Strony 2-3 "GEN 2.1.3" → grupa: "GEN 2.1", pages: [2,3]
-- Strony 4-6 "AD 2.12", góra "(EPWA)" → grupa: "EPWA", pages: [4,5,6]
+- Strona 1-3 → grupa: "FRONT PAGE", pages: [1,2,3]
+- Strony 4-5 nagłówek "GEN 0.4" → grupa: "GEN 0.4", pages: [4,5]
+- Strony 6-7-8 nagłówek "ENR 1.3" → grupa: "ENR 1.3", pages: [6,7,8]
+- Strony 9-10-11-12-13 nagłówek "ENR 4.4" → grupa: "ENR 4.4", pages: [9,10,11,12,13] (JEDNA grupa!)
+- Strona 14 nagłówek "AD 1.1" → grupa: "AD 1.1", pages: [14]
+- Strony 15-16-17-18-19-20-21: nagłówek "AD 2.x", góra "(LROP)" → grupa: "LROP", pages: [15,16,17,18,19,20,21] (JEDNA grupa!)
+- Strony 22-23: nagłówek "AD 2.x", góra "LRBC" → grupa: "LRBC", pages: [22,23]
+- Strony 24-25-26-27-28: nagłówek "AD 2.x", góra "LRBM" → grupa: "LRBM", pages: [24,25,26,27,28] (JEDNA grupa!)
 
 ZWRÓĆ WYŁĄCZNIE czysty JSON (bez markdown, bez \`\`\`):
 {
   "doc_title": "ROMANIA AMDT 012/25",
   "country": "ROMANIA",
   "icao_prefix": "LR",
+  "total_pages": 45,
   "groups": [
-    {"group_title": "FRONT PAGE", "pages": [1]},
-    {"group_title": "GEN 0.4", "pages": [2,3,4]},
-    {"group_title": "ENR 1.3", "pages": [5,6]},
-    {"group_title": "AD 1.1", "pages": [7]},
-    {"group_title": "LROP", "pages": [8,9]},
-    {"group_title": "LRBC", "pages": [10,11,12]},
-    {"group_title": "LRTR", "pages": [13,14]}
+    {"group_title": "FRONT PAGE", "pages": [1,2,3], "subsections": []},
+    {"group_title": "GEN 0.4", "pages": [4,5], "subsections": []},
+    {"group_title": "ENR 1.3", "pages": [6,7,8], "subsections": []},
+    {"group_title": "ENR 4.4", "pages": [9,10,11,12,13], "subsections": []},
+    {"group_title": "AD 1.1", "pages": [14], "subsections": []},
+    {"group_title": "LROP", "pages": [15,16,17,18,19,20,21], "subsections": ["AD 2.1", "AD 2.2", "AD 2.12", "AD 2.14"]},
+    {"group_title": "LRBC", "pages": [22,23,24,25,26], "subsections": ["AD 2.1", "AD 2.2", "AD 2.3", "AD 2.14"]},
+    {"group_title": "LRBM", "pages": [27,28,29], "subsections": ["AD 2.2", "AD 2.12"]}
   ]
 }
 
 KRYTYCZNE: 
-- Pole "pages" zawiera TYLKO liczby całkowite
+- GRUPUJ strony z tym samym tytułem RAZEM w jedną grupę!
+- Pole "pages" to lista liczb: [1,2,3,4,5] nie [1], [2], [3]!
+- Pole "subsections" to lista podsekcji dla ICAO (puste [] dla GEN/ENR/AD 0-1)
 - Każda strona należy do DOKŁADNIE JEDNEJ grupy
+- WSZYSTKIE strony dokumentu muszą być przypisane!
+- Pole "total_pages" = całkowita liczba stron w dokumencie
 - Format odpowiedzi DOKŁADNIE jak powyżej
 - Zakończ token __END__`;
 
@@ -426,7 +447,7 @@ KRYTYCZNE:
                         
                         // Jeśli overloaded, czekaj i próbuj ponownie
                         if (errorMsg.includes('overloaded') && attempt < 3) {
-                            showStatus('info', `Model przeciążony, ponawiam próbę ${attempt}/3...`);
+                            showStatus('info', `Model overloaded, retrying ${attempt}/3...`);
                             await new Promise(resolve => setTimeout(resolve, 3000));
                             continue;
                         }
@@ -448,11 +469,31 @@ KRYTYCZNE:
                     }
 
                     const parsed = JSON.parse(jsonMatch[0]);
-                    return parsed.groups || [];
+                    
+                    // Sprawdź czy wszystkie strony są przypisane
+                    const totalPages = parsed.total_pages || 0;
+                    const assignedPages = new Set();
+                    for (const group of (parsed.groups || [])) {
+                        for (const page of (group.pages || [])) {
+                            assignedPages.add(page);
+                        }
+                    }
+                    
+                    // Ostrzeżenie jeśli brakuje stron
+                    if (totalPages > 0 && assignedPages.size < totalPages) {
+                        const missing = [];
+                        for (let i = 1; i <= totalPages; i++) {
+                            if (!assignedPages.has(i)) missing.push(i);
+                        }
+                        console.warn('WARNING: Some pages not assigned:', missing);
+                        return { groups: parsed.groups || [], missing_pages: missing };
+                    }
+                    
+                    return { groups: parsed.groups || [], missing_pages: [] };
                     
                 } catch (error) {
                     if (attempt === 3) throw error;
-                    showStatus('info', `Próba ${attempt}/3 nieudana, ponawiam...`);
+                    showStatus('info', `Attempt ${attempt}/3 failed, retrying...`);
                     await new Promise(resolve => setTimeout(resolve, 2000));
                 }
             }
@@ -473,18 +514,21 @@ KRYTYCZNE:
         }
 
         function displayResults(results) {
-            resultsDiv.innerHTML = '<h3 style="margin-bottom: 15px;">📥 Pobierz podzielone pliki:</h3>';
+            resultsDiv.innerHTML = '<h3 style="margin-bottom: 20px; color: #c9d1d9; font-weight: 500; font-size: 1.1em;">Download split files:</h3>';
             
             results.forEach((result, index) => {
                 const div = document.createElement('div');
                 div.className = 'result-item';
+                
+                // Dla ICAO pokaż podsekcje
+                const subsectionsHtml = result.subsections && result.subsections.length > 0
+                    ? `<div class="result-subsections">${result.subsections.join(', ')}</div>`
+                    : `<div class="result-subsections">—</div>`;
+                
                 div.innerHTML = `
-                    <div>
-                        <strong>${result.title}</strong>
-                        <br>
-                        <small>${result.pages} ${result.pages === 1 ? 'strona' : 'stron'}</small>
-                    </div>
-                    <button onclick="downloadPDF(${index})">Pobierz PDF</button>
+                    <div class="result-title">${result.title}</div>
+                    ${subsectionsHtml}
+                    <button onclick="downloadPDF(${index})">Download PDF</button>
                 `;
                 resultsDiv.appendChild(div);
             });
