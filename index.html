@@ -161,7 +161,7 @@
 </head>
 <body>
     <div class="container">
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v4.0.2 Claude</div>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v4.0.3 Claude</div>
         <h1>JeppSRC</h1>
         <p class="subtitle">AIP AMDT Document Splitter - ICAO Annex 15 Compliant</p>
         
@@ -241,8 +241,7 @@
             if (!selectedFile) return;
 
             const apiKey = apiKeyInput.value.trim();
-            if (!apiKey || apiKey === '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
-') {
+            if (!apiKey || apiKey === 'WKLEJ_TUTAJ_KLUCZ_ANTHROPIC') {
                 showStatus('error', 'Anthropic API Key required!');
                 return;
             }
@@ -497,7 +496,7 @@ KRYTYCZNE PRZYPOMNIENIE:
                             continue;
                         }
                         
-                        throw new Error(`Gemini API error: ${errorMsg}`);
+                        throw new Error(`Claude API error: ${errorMsg}`);
                     }
 
                     const data = await response.json();
