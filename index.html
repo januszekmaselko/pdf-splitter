@@ -161,7 +161,7 @@
 </head>
 <body>
     <div class="container">
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v4.0.0 Claude</div>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v4.0.2 Claude</div>
         <h1>JeppSRC</h1>
         <p class="subtitle">AIP AMDT Document Splitter - ICAO Annex 15 Compliant</p>
         
@@ -257,10 +257,19 @@
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
                 const totalPages = pdfDoc.getPageCount();
 
-                // Krok 2: Konwertuj PDF do base64 (bez prefiksu)
+                // Krok 2: Konwertuj PDF do base64 bezpiecznie (dla dużych plików)
                 showStatus('info', `Analyzing document structure (${totalPages} pages) with Claude AI...`);
                 const pdfBytes = await selectedFile.arrayBuffer();
-                const base64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
+                
+                // Bezpieczna konwersja base64 dla dużych plików
+                const uint8Array = new Uint8Array(pdfBytes);
+                let binaryString = '';
+                const chunkSize = 8192;
+                for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                    const chunk = uint8Array.subarray(i, i + chunkSize);
+                    binaryString += String.fromCharCode.apply(null, chunk);
+                }
+                const base64 = btoa(binaryString);
                 
                 const analysisResult = await analyzeWithClaude(base64, apiKey);
                 const groups = analysisResult.groups || [];
