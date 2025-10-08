@@ -242,7 +242,7 @@
 
             const apiKey = apiKeyInput.value.trim();
             if (!apiKey || apiKey === 'WKLEJ_TUTAJ_KLUCZ_ANTHROPIC') {
-                showStatus('error', 'Anthropic API Key required! Edit index.html and replace WKLEJ_TUTAJ_KLUCZ_ANTHROPIC with your key from console.anthropic.com');
+                showStatus('error', 'Anthropic API Key required!');
                 return;
             }
 
@@ -257,11 +257,12 @@
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
                 const totalPages = pdfDoc.getPageCount();
 
-                // Krok 2: Wyślij do Gemini
-                showStatus('info', `Analyzing document structure (${totalPages} pages)...`);
-                const base64 = await fileToBase64(selectedFile);
+                // Krok 2: Konwertuj PDF do base64 (bez prefiksu)
+                showStatus('info', `Analyzing document structure (${totalPages} pages) with Claude AI...`);
+                const pdfBytes = await selectedFile.arrayBuffer();
+                const base64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
                 
-                const analysisResult = await analyzeWithGemini(base64, apiKey);
+                const analysisResult = await analyzeWithClaude(base64, apiKey);
                 const groups = analysisResult.groups || [];
                 const missingPages = analysisResult.missing_pages || [];
                 
@@ -319,7 +320,7 @@
             }
         });
 
-        async function analyzeWithGemini(base64Data, apiKey) {
+        async function analyzeWithClaude(base64Data, apiKey) {
             const prompt = `Jesteś "JeppSRC AIP AMDT Analyzer". Otrzymasz PDF - dokument AMDT (Amendment) aktualizujący AIP.
 
 KRYTYCZNE: WSZYSTKIE strony muszą być przypisane do jakiejś grupy! Żadna strona nie może zostać pominięta!
