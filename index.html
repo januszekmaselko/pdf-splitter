@@ -161,7 +161,7 @@
 </head>
 <body>
     <div class="container">
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v2.4.0</div>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v3.0.0</div>
         <h1>JeppSRC</h1>
         <p class="subtitle">AIP AMDT Document Splitter - ICAO Annex 15 Compliant</p>
         
@@ -265,12 +265,20 @@
                 const groups = analysisResult.groups || [];
                 const missingPages = analysisResult.missing_pages || [];
                 
-                // Ostrzeżenie o brakujących stronach - zostaje na stałe
+                // Ostrzeżenie o brakujących stronach - utwórz plik UNKNOWN
                 if (missingPages.length > 0) {
+                    // Dodaj grupę UNKNOWN na początku
+                    groups.unshift({
+                        group_title: 'UNKNOWN',
+                        pages: missingPages,
+                        title: 'Unassigned pages',
+                        subsections: []
+                    });
+                    
                     const warningDiv = document.createElement('div');
                     warningDiv.className = 'status warning';
                     warningDiv.id = 'missing-pages-warning';
-                    warningDiv.innerHTML = `<strong>⚠ WARNING:</strong> ${missingPages.length} pages not assigned to any group: ${missingPages.join(', ')}`;
+                    warningDiv.innerHTML = `<strong>⚠ WARNING:</strong> ${missingPages.length} pages were unassigned and grouped into UNKNOWN file: ${missingPages.join(', ')}`;
                     statusDiv.parentNode.insertBefore(warningDiv, statusDiv);
                 }
 
