@@ -161,12 +161,12 @@
 </head>
 <body>
     <div class="container">
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v3.0.0</div>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v4.0.0 Claude</div>
         <h1>JeppSRC</h1>
         <p class="subtitle">AIP AMDT Document Splitter - ICAO Annex 15 Compliant</p>
         
-        <!-- API Key wbudowany w kod -->
-        <input type="hidden" id="apiKey" value="AIzaSyCR8xuBmxNo6znaGmGvKBXk9rZN-wwDOkk">
+        <!-- Claude API Key wbudowany w kod -->
+        <input type="hidden" id="apiKey" value="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">
 
         <div class="upload-area" id="uploadArea">
             <h3 style="color: #c9d1d9; font-weight: 500; margin-bottom: 10px;">Drag PDF here or click to select file</h3>
@@ -241,8 +241,8 @@
             if (!selectedFile) return;
 
             const apiKey = apiKeyInput.value.trim();
-            if (!apiKey || apiKey === 'WKLEJ_TUTAJ_SWÓJ_KLUCZ_API') {
-                showStatus('error', 'Musisz wkleić swój klucz API w kodzie HTML! Edytuj plik index.html i znajdź linię z "WKLEJ_TUTAJ_SWÓJ_KLUCZ_API"');
+            if (!apiKey || apiKey === 'WKLEJ_TUTAJ_KLUCZ_ANTHROPIC') {
+                showStatus('error', 'Anthropic API Key required! Edit index.html and replace WKLEJ_TUTAJ_KLUCZ_ANTHROPIC with your key from console.anthropic.com');
                 return;
             }
 
