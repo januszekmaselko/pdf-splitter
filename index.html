@@ -269,17 +269,16 @@
         .text-preview {
             font-size: 11px;
             color: #999;
-            max-width: 300px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            max-width: 500px;
+            font-family: monospace;
+            white-space: pre-wrap;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📄 JeppTEST4 - Regex Header Detection</h1>
-        <p class="subtitle">100% niezawodne wykrywanie nagłówków bez AI • Tylko regex + pdf.js • <strong>v1.4</strong></p>
+        <p class="subtitle">100% niezawodne wykrywanie nagłówków bez AI • Tylko regex + pdf.js • <strong>v1.5 DEBUG</strong></p>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📁</div>
@@ -308,7 +307,7 @@
                         <th>Nr strony</th>
                         <th>Sekcja</th>
                         <th>Wykryty nagłówek</th>
-                        <th>Podgląd tekstu (pierwsze 100 znaków)</th>
+                        <th>Pierwsze 200 znaków tekstu (RAW)</th>
                     </tr>
                 </thead>
                 <tbody id="resultsTable"></tbody>
@@ -389,7 +388,7 @@
                         page: pageNum,
                         section: detection.section,
                         header: detection.header,
-                        textPreview: text.substring(0, 100)
+                        textPreview: text.substring(0, 200)
                     });
                 }
 
