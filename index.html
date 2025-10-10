@@ -408,19 +408,17 @@
 
         // FUNKCJA WYKRYWAJĄCA SEKCJĘ
         function detectSection(text, pageNum) {
-            // Usuń białe znaki dla lepszego matchowania
-            const cleanText = text.replace(/\s+/g, ' ').trim();
-            
-            // 1. FRONT PAGE (strony 1-3 bez nagłówka GEN/ENR/AD)
-            if (pageNum <= 3) {
-                const hasHeader = /\b(GEN|ENR|AD)\s+\d+/i.test(cleanText);
-                if (!hasHeader) {
-                    return { section: 'FRONT PAGE', header: '-' };
-                }
+            // KRYTYCZNA ZASADA 1: STRONA 1 = ZAWSZE FRONT PAGE
+            if (pageNum === 1) {
+                return { section: 'FRONT PAGE', header: 'Page 1' };
             }
             
-            // 2. GEN X.Y
-            const genMatch = cleanText.match(/\bGEN\s+(\d+)\.(\d+)/i);
+            // KRYTYCZNA ZASADA 2: TYLKO PIERWSZA LINIJKA!
+            // Bierzemy pierwsze 15 znaków (dokładnie tam gdzie jest nagłówek)
+            const firstLine = text.substring(0, 15).replace(/\s+/g, ' ').trim();
+            
+            // 2. GEN X.Y (tylko z pierwszej linijki!)
+            const genMatch = firstLine.match(/\bGEN\s+(\d+)\.(\d+)/i);
             if (genMatch) {
                 return { 
                     section: 'GEN', 
@@ -428,8 +426,8 @@
                 };
             }
             
-            // 3. ENR X.Y
-            const enrMatch = cleanText.match(/\bENR\s+(\d+)\.(\d+)/i);
+            // 3. ENR X.Y (tylko z pierwszej linijki!)
+            const enrMatch = firstLine.match(/\bENR\s+(\d+)\.(\d+)/i);
             if (enrMatch) {
                 return { 
                     section: 'ENR', 
@@ -437,8 +435,8 @@
                 };
             }
             
-            // 4. AD X.Y
-            const adMatch = cleanText.match(/\bAD\s+(\d+)\.(\d+)/i);
+            // 4. AD X.Y (tylko z pierwszej linijki!)
+            const adMatch = firstLine.match(/\bAD\s+(\d+)\.(\d+)/i);
             if (adMatch) {
                 return { 
                     section: 'AD', 
@@ -446,9 +444,9 @@
                 };
             }
             
-            // 5. ICAO code (4 litery) + AD
+            // 5. ICAO code (4 litery) + AD (tylko z pierwszej linijki!)
             // Wzorce: "LBSP AD", "EYKA AD 2.24", "AD 2 EYKA"
-            const icaoBeforeMatch = cleanText.match(/\b([A-Z]{4})\s+AD\s+/i);
+            const icaoBeforeMatch = firstLine.match(/\b([A-Z]{4})\s+AD\s+/i);
             if (icaoBeforeMatch) {
                 return { 
                     section: 'ICAO', 
@@ -456,7 +454,7 @@
                 };
             }
             
-            const icaoAfterMatch = cleanText.match(/\bAD\s+\d+\s+([A-Z]{4})/i);
+            const icaoAfterMatch = firstLine.match(/\bAD\s+\d+\s+([A-Z]{4})/i);
             if (icaoAfterMatch) {
                 return { 
                     section: 'ICAO', 
@@ -464,7 +462,12 @@
                 };
             }
             
-            // 6. UNKNOWN
+            // 6. FRONT PAGE (strony 2-3 bez nagłówka)
+            if (pageNum <= 3) {
+                return { section: 'FRONT PAGE', header: `Page ${pageNum}` };
+            }
+            
+            // 7. UNKNOWN
             return { section: 'UNKNOWN', header: '-' };
         }
 
