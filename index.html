@@ -181,7 +181,7 @@
 <body>
     <div class="container">
         <!-- WAŻNE: Za każdym razem gdy modyfikujesz ten plik HTML, ZAKTUALIZUJ numer wersji poniżej! -->
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v2.0 NoAI</div>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v2.1 NoAI</div>
         <h1>JeppTEST NoAI</h1>
         <p class="subtitle">Local PDF Parser - No API Required</p>
         <div style="text-align: center;">
@@ -303,16 +303,8 @@
                         .map(item => item.str.trim())
                         .filter(str => str.length > 0);
                     
-                    // Sprawdź górę (pierwsze 10 linii)
-                    const topLines = lines.slice(0, 10).join(' ');
-                    
-                    // Sprawdź dół (ostatnie 10 linii)
-                    const bottomLines = lines.slice(-10).join(' ');
-                    
-                    // Połącz obie sekcje do analizy
-                    const textToAnalyze = topLines + ' ' + bottomLines;
-                    
-                    const header = detectHeader(pageNum, textToAnalyze, lines);
+                    // Bierzemy tylko 2 pierwsze i 2 ostatnie linijki
+                    const header = detectHeader(pageNum, '', lines);
                     results.push(header);
                 }
 
@@ -331,6 +323,11 @@
         });
 
         function detectHeader(pageNum, text, allLines) {
+            // ZASADA: Strona 1 to ZAWSZE FRONT PAGE
+            if (pageNum === 1) {
+                return { page: pageNum, header: 'FRONT PAGE', location: 'page 1' };
+            }
+            
             // Regex patterns
             const genPattern = /GEN\s+(\d+)\.(\d+)/i;
             const enrPattern = /ENR\s+(\d+)\.(\d+)/i;
@@ -338,8 +335,8 @@
             
             let location = 'not found';
             
-            // Sprawdź pierwsze 10 linii (góra)
-            const topText = allLines.slice(0, 10).join(' ');
+            // Sprawdź TYLKO 2 pierwsze linijki (góra)
+            const topText = allLines.slice(0, 2).join(' ');
             let match;
             
             if (match = topText.match(genPattern)) {
@@ -352,8 +349,8 @@
                 return { page: pageNum, header: `AD ${match[1]}.${match[2]}`, location: 'top' };
             }
             
-            // Sprawdź ostatnie 10 linii (dół)
-            const bottomText = allLines.slice(-10).join(' ');
+            // Sprawdź TYLKO 2 ostatnie linijki (dół)
+            const bottomText = allLines.slice(-2).join(' ');
             
             if (match = bottomText.match(genPattern)) {
                 return { page: pageNum, header: `GEN ${match[1]}.${match[2]}`, location: 'bottom' };
@@ -366,7 +363,7 @@
             }
             
             // Jeśli nic nie znaleziono
-            if (pageNum <= 3) {
+            if (pageNum === 2 || pageNum === 3) {
                 return { page: pageNum, header: 'FRONT PAGE', location: 'assumption' };
             }
             
@@ -394,9 +391,10 @@
                 else if (header.startsWith('ENR')) headerClass = 'header-enr';
                 else if (header.startsWith('AD')) headerClass = 'header-ad';
                 
-                const locationEmoji = r.location === 'top' ? '⬆️ Top' : 
-                                     r.location === 'bottom' ? '⬇️ Bottom' : 
-                                     r.location === 'assumption' ? '📌 Assumed' : '❓ N/A';
+                const locationEmoji = r.location === 'top' ? '⬆️ Top (2 lines)' : 
+                                     r.location === 'bottom' ? '⬇️ Bottom (2 lines)' : 
+                                     r.location === 'page 1' ? '📄 Page 1 (always)' :
+                                     r.location === 'assumption' ? '📌 Assumed (pg 2-3)' : '❓ Not found';
                 
                 html += `<tr>
                     <td>${r.page}</td>
@@ -410,7 +408,7 @@
             
             // Summary
             const summary = {};
-            const locationStats = { top: 0, bottom: 0, notFound: 0 };
+            const locationStats = { top: 0, bottom: 0, page1: 0, notFound: 0 };
             
             results.forEach(r => {
                 const h = r.header || 'UNKNOWN';
@@ -418,6 +416,7 @@
                 
                 if (r.location === 'top') locationStats.top++;
                 else if (r.location === 'bottom') locationStats.bottom++;
+                else if (r.location === 'page 1') locationStats.page1++;
                 else if (r.location === 'not found') locationStats.notFound++;
             });
             
@@ -438,8 +437,9 @@
             html += '<div>';
             html += '<strong>Header locations:</strong><br>';
             html += '<div style="font-family: monospace; font-size: 0.9em; margin-top: 5px;">';
-            html += `<div>⬆️ Top: <strong>${locationStats.top}</strong></div>`;
-            html += `<div>⬇️ Bottom: <strong>${locationStats.bottom}</strong></div>`;
+            html += `<div>📄 Page 1: <strong>${locationStats.page1}</strong></div>`;
+            html += `<div>⬆️ Top (2 lines): <strong>${locationStats.top}</strong></div>`;
+            html += `<div>⬇️ Bottom (2 lines): <strong>${locationStats.bottom}</strong></div>`;
             html += `<div>❓ Not found: <strong>${locationStats.notFound}</strong></div>`;
             html += '</div></div>';
             
