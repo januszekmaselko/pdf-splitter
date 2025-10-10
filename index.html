@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JeppTEST5 FIXED - PDF Section Detector</title>
+    <title>JeppTEST5 FIXED v2 - PDF Section Detector</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         * {
@@ -255,8 +255,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>📄 JeppTEST5 FIXED - PDF Section Detector</h1>
-        <p class="subtitle">PDF → HTML z pozycjami → czytanie od góry • <strong>v2.3 - REGEX NAPRAWIONY (bez spacji)</strong></p>
+        <h1>📄 JeppTEST5 FIXED v2 - PDF Section Detector</h1>
+        <p class="subtitle">PDF → HTML z pozycjami → czytanie od góry • <strong>v2.4 - FRONT PAGE tylko na początku + regex AD2.8</strong></p>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📁</div>
@@ -361,8 +361,9 @@
                     // Wyciągnij czysty tekst z HTML (od góry do dołu)
                     const cleanText = htmlText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
                     
-                    // Wykryj sekcję
-                    const detection = detectSection(cleanText, pageNum);
+                    // Wykryj sekcję (przekaż poprzednią sekcję)
+                    const previousSection = results.length > 0 ? results[results.length - 1].section : null;
+                    const detection = detectSection(cleanText, pageNum, previousSection);
                     
                     results.push({
                         page: pageNum,
@@ -402,24 +403,32 @@
             return html;
         }
 
-        // FUNKCJA WYKRYWAJĄCA SEKCJĘ - NAPRAWIONA!
-        function detectSection(text, pageNum) {
-            // STRONA 1 = ZAWSZE FRONT PAGE
+        // FUNKCJA WYKRYWAJĄCA SEKCJĘ - NAJNOWSZA WERSJA
+        function detectSection(text, pageNum, previousSection) {
+            // ============================================
+            // ZASADA 1: FRONT PAGE tylko na początku
+            // ============================================
+            
+            // Strona 1 = ZAWSZE FRONT PAGE
             if (pageNum === 1) {
                 return { section: 'FRONT PAGE', header: 'Page 1' };
             }
             
-            // KRYTYCZNE: Jeśli w górnej części strony (pierwsze 100 znaków) jest "AMDT" → FRONT PAGE
+            // WAŻNE: FRONT PAGE może być tylko jeśli poprzednia strona była FRONT PAGE
+            // (czyli ciąg FRONT PAGE na początku dokumentu: 1, 2, 3...)
             const topText = text.substring(0, 100).toUpperCase();
-            if (topText.includes('AMDT')) {
+            if (topText.includes('AMDT') && previousSection === 'FRONT PAGE') {
                 return { section: 'FRONT PAGE', header: `Page ${pageNum} (AMDT)` };
             }
+            
+            // ============================================
+            // ZASADA 2: Szukaj nagłówków sekcji
+            // ============================================
             
             // Znajdź wszystkie nagłówki i wybierz pierwszy
             const matches = [];
             
-            // ✅ NAPRAWIONE: Szukaj GEN X.Y (ze spacją LUB BEZ)
-            // \s* = zero lub więcej spacji
+            // ✅ GEN X.Y (ze spacją lub bez)
             let genMatch = text.match(/\bGEN\s*(\d+)\.(\d+)/i);
             if (genMatch) {
                 matches.push({
@@ -429,7 +438,7 @@
                 });
             }
             
-            // ✅ NAPRAWIONE: Szukaj ENR X.Y (ze spacją LUB BEZ)
+            // ✅ ENR X.Y (ze spacją lub bez)
             let enrMatch = text.match(/\bENR\s*(\d+)\.(\d+)/i);
             if (enrMatch) {
                 matches.push({
@@ -439,7 +448,8 @@
                 });
             }
             
-            // ✅ NAPRAWIONE: Szukaj AD X.Y (ze spacją LUB BEZ)
+            // ✅ AD X.Y - dwa wzorce:
+            // 1) AD 2.5 (spacja między AD i cyfrą)
             let adMatch = text.match(/\bAD\s*(\d+)\.(\d+)/i);
             if (adMatch) {
                 matches.push({
@@ -447,6 +457,18 @@
                     section: 'AD',
                     header: `AD ${adMatch[1]}.${adMatch[2]}`
                 });
+            }
+            
+            // 2) AD2 .8 lub AD2.8 (cyfra przyklejona do AD)
+            if (!adMatch) {
+                let adMatch2 = text.match(/\bAD(\d+)\s*\.(\d+)/i);
+                if (adMatch2) {
+                    matches.push({
+                        index: text.indexOf(adMatch2[0]),
+                        section: 'AD',
+                        header: `AD ${adMatch2[1]}.${adMatch2[2]}`
+                    });
+                }
             }
             
             // Szukaj ICAO + AD
@@ -474,7 +496,9 @@
                 return matches[0];
             }
             
-            // UNKNOWN - nie ma nagłówka i nie ma AMDT
+            // ============================================
+            // ZASADA 3: Jeśli nic nie znaleziono = UNKNOWN
+            // ============================================
             return { section: 'UNKNOWN', header: '-' };
         }
 
