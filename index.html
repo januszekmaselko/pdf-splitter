@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JeppTEST5 - PDF to HTML</title>
+    <title>JeppTEST5 FIXED - PDF Section Detector</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         * {
@@ -71,28 +71,6 @@
         .upload-icon {
             font-size: 48px;
             margin-bottom: 15px;
-        }
-        
-        .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: transform 0.2s;
-            margin: 5px;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
         }
         
         .progress-container {
@@ -277,8 +255,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>📄 JeppTEST5 - PDF to HTML</h1>
-        <p class="subtitle">PDF → HTML z pozycjami → czytanie od góry • <strong>v2.0</strong></p>
+        <h1>📄 JeppTEST5 FIXED - PDF Section Detector</h1>
+        <p class="subtitle">PDF → HTML z pozycjami → czytanie od góry • <strong>v2.3 - REGEX NAPRAWIONY (bez spacji)</strong></p>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📁</div>
@@ -424,18 +402,25 @@
             return html;
         }
 
-        // FUNKCJA WYKRYWAJĄCA SEKCJĘ
+        // FUNKCJA WYKRYWAJĄCA SEKCJĘ - NAPRAWIONA!
         function detectSection(text, pageNum) {
             // STRONA 1 = ZAWSZE FRONT PAGE
             if (pageNum === 1) {
                 return { section: 'FRONT PAGE', header: 'Page 1' };
             }
             
+            // KRYTYCZNE: Jeśli w górnej części strony (pierwsze 100 znaków) jest "AMDT" → FRONT PAGE
+            const topText = text.substring(0, 100).toUpperCase();
+            if (topText.includes('AMDT')) {
+                return { section: 'FRONT PAGE', header: `Page ${pageNum} (AMDT)` };
+            }
+            
             // Znajdź wszystkie nagłówki i wybierz pierwszy
             const matches = [];
             
-            // Szukaj GEN X.Y
-            const genMatch = text.match(/\bGEN\s+(\d+)\.(\d+)/i);
+            // ✅ NAPRAWIONE: Szukaj GEN X.Y (ze spacją LUB BEZ)
+            // \s* = zero lub więcej spacji
+            let genMatch = text.match(/\bGEN\s*(\d+)\.(\d+)/i);
             if (genMatch) {
                 matches.push({
                     index: text.indexOf(genMatch[0]),
@@ -444,8 +429,8 @@
                 });
             }
             
-            // Szukaj ENR X.Y
-            const enrMatch = text.match(/\bENR\s+(\d+)\.(\d+)/i);
+            // ✅ NAPRAWIONE: Szukaj ENR X.Y (ze spacją LUB BEZ)
+            let enrMatch = text.match(/\bENR\s*(\d+)\.(\d+)/i);
             if (enrMatch) {
                 matches.push({
                     index: text.indexOf(enrMatch[0]),
@@ -454,8 +439,8 @@
                 });
             }
             
-            // Szukaj AD X.Y
-            const adMatch = text.match(/\bAD\s+(\d+)\.(\d+)/i);
+            // ✅ NAPRAWIONE: Szukaj AD X.Y (ze spacją LUB BEZ)
+            let adMatch = text.match(/\bAD\s*(\d+)\.(\d+)/i);
             if (adMatch) {
                 matches.push({
                     index: text.indexOf(adMatch[0]),
@@ -489,12 +474,7 @@
                 return matches[0];
             }
             
-            // FRONT PAGE (strony 2-3 bez nagłówka)
-            if (pageNum <= 3) {
-                return { section: 'FRONT PAGE', header: `Page ${pageNum}` };
-            }
-            
-            // UNKNOWN
+            // UNKNOWN - nie ma nagłówka i nie ma AMDT
             return { section: 'UNKNOWN', header: '-' };
         }
 
