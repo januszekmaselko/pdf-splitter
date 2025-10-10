@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JeppTEST4 - Regex Header Detection</title>
+    <title>JeppTEST5 - PDF to HTML</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         * {
@@ -277,8 +277,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>📄 JeppTEST4 - Regex Header Detection</h1>
-        <p class="subtitle">100% niezawodne wykrywanie nagłówków bez AI • Tylko regex + pdf.js • <strong>v1.6 - SORTED BY Y</strong></p>
+        <h1>📄 JeppTEST5 - PDF to HTML</h1>
+        <p class="subtitle">PDF → HTML z pozycjami → czytanie od góry • <strong>v2.0</strong></p>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📁</div>
@@ -307,7 +307,7 @@
                         <th>Nr strony</th>
                         <th>Sekcja</th>
                         <th>Wykryty nagłówek</th>
-                        <th>Pierwsze 200 znaków tekstu (RAW)</th>
+                        <th>Pierwsze 200 znaków (HTML→TEXT od góry)</th>
                     </tr>
                 </thead>
                 <tbody id="resultsTable"></tbody>
@@ -359,7 +359,6 @@
                 progressFill.style.width = '10%';
                 progressFill.textContent = '10%';
 
-                // Wczytaj PDF
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
                 const totalPages = pdf.numPages;
@@ -378,22 +377,20 @@
                     const page = await pdf.getPage(pageNum);
                     const textContent = await page.getTextContent();
                     
-                    // KRYTYCZNE: Sortuj według pozycji Y (od góry = większy Y)
-                    const sortedItems = textContent.items.sort((a, b) => {
-                        return b.transform[5] - a.transform[5]; // Y od góry do dołu
-                    });
+                    // KRYTYCZNE: Zamień na HTML z pozycjami
+                    const htmlText = await convertToHTML(textContent);
                     
-                    // Wyciągnij tekst (już posortowany od góry)
-                    const text = sortedItems.map(item => item.str).join(' ');
+                    // Wyciągnij czysty tekst z HTML (od góry do dołu)
+                    const cleanText = htmlText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
                     
                     // Wykryj sekcję
-                    const detection = detectSection(text, pageNum);
+                    const detection = detectSection(cleanText, pageNum);
                     
                     results.push({
                         page: pageNum,
                         section: detection.section,
                         header: detection.header,
-                        textPreview: text.substring(0, 200)
+                        textPreview: cleanText.substring(0, 200)
                     });
                 }
 
@@ -401,7 +398,6 @@
                 progressFill.textContent = '100%';
                 status.textContent = 'Gotowe!';
 
-                // Wyświetl wyniki
                 displayResults(results);
 
             } catch (error) {
@@ -410,70 +406,95 @@
             }
         }
 
+        // KONWERSJA PDF → HTML (z pozycjami Y od góry do dołu)
+        async function convertToHTML(textContent) {
+            // Sortuj elementy według Y (od góry = większy Y)
+            const sortedItems = textContent.items.sort((a, b) => {
+                return b.transform[5] - a.transform[5]; // Y od góry
+            });
+            
+            // Buduj HTML
+            let html = '';
+            sortedItems.forEach(item => {
+                const y = Math.round(item.transform[5]);
+                const x = Math.round(item.transform[4]);
+                html += `<div style="position:absolute; top:${y}px; left:${x}px">${item.str}</div>\n`;
+            });
+            
+            return html;
+        }
+
         // FUNKCJA WYKRYWAJĄCA SEKCJĘ
         function detectSection(text, pageNum) {
-            // KRYTYCZNA ZASADA 1: STRONA 1 = ZAWSZE FRONT PAGE
+            // STRONA 1 = ZAWSZE FRONT PAGE
             if (pageNum === 1) {
                 return { section: 'FRONT PAGE', header: 'Page 1' };
             }
             
-            // KRYTYCZNA ZASADA 2: BIERZEMY PIERWSZY WYKRYTY NAGŁÓWEK OD GÓRY!
-            // Regex automatycznie znajdzie pierwszy match = od góry strony
-            // Nie limitujemy znaków - regex szuka w całym tekście ale zwraca pierwszy
+            // Znajdź wszystkie nagłówki i wybierz pierwszy
+            const matches = [];
             
-            const cleanText = text.replace(/\s+/g, ' ').trim();
-            
-            // 2. GEN X.Y (PIERWSZY od góry!)
-            const genMatch = cleanText.match(/\bGEN\s+(\d+)\.(\d+)/i);
+            // Szukaj GEN X.Y
+            const genMatch = text.match(/\bGEN\s+(\d+)\.(\d+)/i);
             if (genMatch) {
-                return { 
-                    section: 'GEN', 
-                    header: `GEN ${genMatch[1]}.${genMatch[2]}` 
-                };
+                matches.push({
+                    index: text.indexOf(genMatch[0]),
+                    section: 'GEN',
+                    header: `GEN ${genMatch[1]}.${genMatch[2]}`
+                });
             }
             
-            // 3. ENR X.Y (PIERWSZY od góry!)
-            const enrMatch = cleanText.match(/\bENR\s+(\d+)\.(\d+)/i);
+            // Szukaj ENR X.Y
+            const enrMatch = text.match(/\bENR\s+(\d+)\.(\d+)/i);
             if (enrMatch) {
-                return { 
-                    section: 'ENR', 
-                    header: `ENR ${enrMatch[1]}.${enrMatch[2]}` 
-                };
+                matches.push({
+                    index: text.indexOf(enrMatch[0]),
+                    section: 'ENR',
+                    header: `ENR ${enrMatch[1]}.${enrMatch[2]}`
+                });
             }
             
-            // 4. AD X.Y (PIERWSZY od góry!)
-            const adMatch = cleanText.match(/\bAD\s+(\d+)\.(\d+)/i);
+            // Szukaj AD X.Y
+            const adMatch = text.match(/\bAD\s+(\d+)\.(\d+)/i);
             if (adMatch) {
-                return { 
-                    section: 'AD', 
-                    header: `AD ${adMatch[1]}.${adMatch[2]}` 
-                };
+                matches.push({
+                    index: text.indexOf(adMatch[0]),
+                    section: 'AD',
+                    header: `AD ${adMatch[1]}.${adMatch[2]}`
+                });
             }
             
-            // 5. ICAO code (4 litery) + AD (PIERWSZY od góry!)
-            // Wzorce: "LBSP AD", "EYKA AD 2.24", "AD 2 EYKA"
-            const icaoBeforeMatch = cleanText.match(/\b([A-Z]{4})\s+AD\s+/i);
+            // Szukaj ICAO + AD
+            const icaoBeforeMatch = text.match(/\b([A-Z]{4})\s+AD\s+/i);
             if (icaoBeforeMatch) {
-                return { 
-                    section: 'ICAO', 
-                    header: icaoBeforeMatch[1] 
-                };
+                matches.push({
+                    index: text.indexOf(icaoBeforeMatch[0]),
+                    section: 'ICAO',
+                    header: icaoBeforeMatch[1]
+                });
             }
             
-            const icaoAfterMatch = cleanText.match(/\bAD\s+\d+\s+([A-Z]{4})/i);
+            const icaoAfterMatch = text.match(/\bAD\s+\d+\s+([A-Z]{4})/i);
             if (icaoAfterMatch) {
-                return { 
-                    section: 'ICAO', 
-                    header: icaoAfterMatch[1] 
-                };
+                matches.push({
+                    index: text.indexOf(icaoAfterMatch[0]),
+                    section: 'ICAO',
+                    header: icaoAfterMatch[1]
+                });
             }
             
-            // 6. FRONT PAGE (strony 2-3 bez nagłówka)
+            // WYBIERZ PIERWSZY (najmniejszy index)
+            if (matches.length > 0) {
+                matches.sort((a, b) => a.index - b.index);
+                return matches[0];
+            }
+            
+            // FRONT PAGE (strony 2-3 bez nagłówka)
             if (pageNum <= 3) {
                 return { section: 'FRONT PAGE', header: `Page ${pageNum}` };
             }
             
-            // 7. UNKNOWN
+            // UNKNOWN
             return { section: 'UNKNOWN', header: '-' };
         }
 
