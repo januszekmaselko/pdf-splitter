@@ -355,11 +355,8 @@
                     const page = await pdf.getPage(pageNum);
                     const textContent = await page.getTextContent();
                     
-                    // KRYTYCZNE: Zamień na HTML z pozycjami
-                    const htmlText = await convertToHTML(textContent);
-                    
-                    // Wyciągnij czysty tekst z HTML (od góry do dołu)
-                    const cleanText = htmlText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                    // KRYTYCZNE: Wyciągnij tekst z PDF (już posortowany)
+                    const cleanText = await convertToHTML(textContent);
                     
                     // Wykryj sekcję (przekaż poprzednią sekcję)
                     const previousSection = results.length > 0 ? results[results.length - 1].section : null;
@@ -385,22 +382,29 @@
             }
         }
 
-        // KONWERSJA PDF → HTML (z pozycjami Y od góry do dołu)
+        // KONWERSJA PDF → TEXT (sortowany według Y od góry do dołu)
         async function convertToHTML(textContent) {
             // Sortuj elementy według Y (od góry = większy Y)
             const sortedItems = textContent.items.sort((a, b) => {
-                return b.transform[5] - a.transform[5]; // Y od góry
+                const yDiff = Math.abs(b.transform[5] - a.transform[5]);
+                // Jeśli Y jest podobne (różnica < 5px) = ta sama linia
+                if (yDiff < 5) {
+                    // Sortuj po X (lewo → prawo)
+                    return a.transform[4] - b.transform[4];
+                }
+                // Inaczej sortuj po Y (góra → dół)
+                return b.transform[5] - a.transform[5];
             });
             
-            // Buduj HTML
-            let html = '';
+            // Złóż tekst bezpośrednio z item.str
+            let text = '';
             sortedItems.forEach(item => {
-                const y = Math.round(item.transform[5]);
-                const x = Math.round(item.transform[4]);
-                html += `<div style="position:absolute; top:${y}px; left:${x}px">${item.str}</div>\n`;
+                if (item.str && item.str.trim()) {
+                    text += item.str + ' ';
+                }
             });
             
-            return html;
+            return text.trim();
         }
 
         // FUNKCJA WYKRYWAJĄCA SEKCJĘ - NAJNOWSZA WERSJA
