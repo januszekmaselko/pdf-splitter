@@ -152,7 +152,7 @@
 <body>
     <div class="container">
         <!-- WAŻNE: Za każdym razem gdy modyfikujesz ten plik HTML, ZAKTUALIZUJ numer wersji poniżej! -->
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v1.0 TEST</div>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v1.1 TEST</div>
         <h1>JeppTEST</h1>
         <p class="subtitle">Header Detection Test - Simple Page Analysis</p>
         
@@ -278,14 +278,16 @@
 
 Your ONLY task: For EACH page in the PDF, identify the header text at the TOP of the page.
 
+CRITICAL: YOU MUST ANALYZE EVERY SINGLE PAGE FROM 1 TO THE LAST PAGE. DO NOT SKIP ANY PAGES.
+
 RULES:
 1. Look at the FIRST 1-3 lines of each page (the very top)
 2. Identify the header type:
-   - FRONT PAGE: if no GEN/ENR/AD header found (usually page 1-3)
+   - FRONT PAGE: ONLY if this is page 1, 2, or 3 AND no GEN/ENR/AD header is visible
    - GEN X.Y: if you see "GEN" followed by numbers like "GEN 0.4", "GEN 3.2"
    - ENR X.Y: if you see "ENR" followed by numbers like "ENR 1.3", "ENR 4.4"
    - AD X.Y: if you see "AD" followed by numbers like "AD 0.6", "AD 2.12"
-   - UNKNOWN: if page is blank or unreadable
+   - UNKNOWN: if no header found (NOT front page)
 
 3. For GEN/ENR/AD headers, extract EXACTLY what you see:
    - "GEN 0.4-1" → return "GEN 0.4"
@@ -293,24 +295,30 @@ RULES:
    - "AD 2.12" → return "AD 2.12"
    - Ignore anything after the dash
 
+4. FRONT PAGE rules:
+   - ONLY pages 1-3 can be FRONT PAGE
+   - After page 3, if no header found → use "UNKNOWN", NOT "FRONT PAGE"
+
+5. If header is not at the top but somewhere else on page → still use "UNKNOWN"
+
 Return ONLY valid JSON in this format:
 {
-  "total_pages": 45,
+  "total_pages": 188,
   "pages": [
     {"page": 1, "header": "FRONT PAGE"},
     {"page": 2, "header": "FRONT PAGE"},
     {"page": 3, "header": "GEN 0.2"},
-    {"page": 4, "header": "GEN 0.2"},
-    {"page": 5, "header": "GEN 0.4"},
-    {"page": 6, "header": "ENR 1.3"}
+    ...
+    {"page": 188, "header": "AD 2.24"}
   ]
 }
 
-IMPORTANT: 
-- Include ALL pages from 1 to total_pages
-- Look ONLY at the top of each page
-- If the text is in an image/scan, use OCR to read it
-- Return pure JSON, no markdown, no explanation
+CRITICAL REQUIREMENT: 
+- The "pages" array MUST contain EXACTLY total_pages entries
+- Every page from 1 to total_pages must be included
+- If you run out of space, prioritize including all page numbers even if you need to be brief
+
+Return pure JSON only, no markdown, no explanation.
 
 END your response with: __END__`;
 
@@ -335,7 +343,7 @@ END your response with: __END__`;
                             }],
                             generationConfig: {
                                 temperature: 0.1,
-                                maxOutputTokens: 8000
+                                maxOutputTokens: 16000  // Zwiększone z 8000
                             }
                         })
                     });
