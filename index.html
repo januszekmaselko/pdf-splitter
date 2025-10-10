@@ -209,7 +209,7 @@
 </head>
 <body>
     <div class="container">
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v1.2 Hybrid</div>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v1.3 Hybrid</div>
         <h1>JeppTEST2</h1>
         <p class="subtitle">Smart PDF Analyzer - Text First, OCR When Needed</p>
         <div style="text-align: center;">
@@ -437,23 +437,29 @@ TAGGED LINE SYSTEM:
 
 Your task: Assign EACH page to a section based on headers.
 
-CRITICAL RULES FOR HEADERS:
+CRITICAL ALGORITHM:
 1. Page 1 is ALWAYS "FRONT PAGE"
-2. Look for section headers in [TOP-1], [TOP-2], or [BOTTOM]:
-   - GEN X.Y (e.g., "GEN 0.4", "GEN 3.2")
-   - ENR X.Y (e.g., "ENR 1.3", "ENR 4.4")
-   - AD X.Y (e.g., "AD 0.6", "AD 2.12")
-3. Extract ONLY the section number (e.g., "GEN 0.4" from "GEN 0.4-1" or "GEN 0.4 Checklist")
-4. Headers are usually in [TOP-1] or [TOP-2], sometimes in [BOTTOM]
-5. If no header found, inherit from previous page
-6. Pages 2-3 without headers = "FRONT PAGE"
 
-IMPORTANT FOR AD 2.X PAGES:
-- For pages with "AD 2." headers, the ICAO code (4 letters) will be in lines [TOP-1] to [TOP-5]
-- Example: "LROP", "EPWA", "LRCK" - these are airport codes
-- Note which ICAO code you find (we'll need it later)
+2. SEARCH FOR HEADER (in this order):
+   Step 1: Look in [TOP-1] for: GEN X.Y, ENR X.Y, or AD X.Y
+   Step 2: If not found in [TOP-1], look in [TOP-2]
+   Step 3: If still not found, inherit from previous page
+   Step 4: Pages 2-3 without headers = "FRONT PAGE"
 
-For raster pages: Use OCR to find headers at top or bottom of image.
+3. EXTRACT SECTION NUMBER:
+   From "GEN 0.4-1" or "GEN 0.4 Checklist" → extract "GEN 0.4"
+   From "ENR 3.2-5" → extract "ENR 3.2"
+   From "AD 1.1-2" → extract "AD 1.1"
+
+4. SPECIAL RULE FOR AD 2.X PAGES:
+   If you find "AD 2" (with or without dot, e.g., "AD 2.12", "AD 2", "AD 2."):
+   - Search for ICAO code in lines [TOP-1] to [TOP-5]
+   - ICAO code = EXACTLY 4 UPPERCASE LETTERS (e.g., "LROP", "EPWA", "LRCK")
+   - First 2 letters = country prefix (e.g., EP=Poland, LR=Romania)
+   - When you find ICAO, USE IT AS SECTION SYMBOL instead of "AD 2.X"
+   - Example: if line has "AD 2.12" and you find "LROP" → section = "LROP" (not "AD 2.12")
+
+For raster pages: Use OCR to find headers at top of image.
 
 PAGE DATA (full text with tagged lines):
 ${JSON.stringify(pagesData, null, 2)}
@@ -463,15 +469,22 @@ ${rasterImages.length > 0 ? 'RASTER PAGES (use OCR on these images):' : 'No rast
 Return JSON in this EXACT format:
 {
   "results": [
-    {"page": 1, "header": "FRONT PAGE", "found_in": "assumption", "icao": null},
-    {"page": 2, "header": "GEN 0.4", "found_in": "top", "icao": null},
-    {"page": 15, "header": "AD 2.12", "found_in": "top", "icao": "LROP"},
+    {"page": 1, "header": "FRONT PAGE", "found_in": "assumption"},
+    {"page": 2, "header": "GEN 0.4", "found_in": "top1"},
+    {"page": 15, "header": "LROP", "found_in": "top1", "note": "AD 2.12"},
     ...
   ]
 }
 
-"found_in" values: "top" (found in TOP-1 or TOP-2), "bottom" (found in BOTTOM), "inherited", "assumption", "ocr"
-"icao": null (for non-AD 2.x pages) or 4-letter code (for AD 2.x pages)`;
+"found_in" values: 
+- "top1" = found in [TOP-1]
+- "top2" = found in [TOP-2]
+- "bottom" = found in [BOTTOM]
+- "inherited" = copied from previous page
+- "assumption" = pages 2-3 without header
+- "ocr" = raster page with OCR
+
+"note": (optional) for AD 2.x pages, include original "AD 2.X" number here`;
 
             // Przygotuj części dla Gemini
             const parts = [{ text: prompt }];
@@ -541,7 +554,7 @@ Return JSON in this EXACT format:
             // Table
             html += '<div class="table-wrapper">';
             html += '<table class="results-table">';
-            html += '<thead><tr><th style="width: 80px;">Page</th><th>Section</th><th style="width: 100px;">ICAO</th><th style="width: 150px;">Found In</th></tr></thead>';
+            html += '<thead><tr><th style="width: 80px;">Page</th><th>Section</th><th style="width: 120px;">Note</th><th style="width: 150px;">Found In</th></tr></thead>';
             html += '<tbody>';
             
             results.forEach(r => {
@@ -552,22 +565,27 @@ Return JSON in this EXACT format:
                 else if (header.startsWith('GEN')) headerClass = 'header-gen';
                 else if (header.startsWith('ENR')) headerClass = 'header-enr';
                 else if (header.startsWith('AD')) headerClass = 'header-ad';
+                else if (header.length === 4 && header === header.toUpperCase()) {
+                    // ICAO code (4 wielkie litery)
+                    headerClass = 'header-ad';
+                }
                 
-                // ICAO dla stron AD 2.x
-                const icaoCode = r.icao ? `<strong>${r.icao}</strong>` : '—';
+                // Note - dla stron ICAO pokazuje oryginalny numer AD 2.x
+                const note = r.note ? `<span style="font-size: 0.85em; color: #666;">${r.note}</span>` : '—';
                 
                 // Emoji dla lokalizacji nagłówka
                 let locationLabel = '❓ Unknown';
-                if (r.found_in === 'top') locationLabel = '⬆️ Top (line 1-2)';
-                else if (r.found_in === 'bottom') locationLabel = '⬇️ Bottom line';
+                if (r.found_in === 'top1') locationLabel = '⬆️ Line 1';
+                else if (r.found_in === 'top2') locationLabel = '⬆️ Line 2';
+                else if (r.found_in === 'bottom') locationLabel = '⬇️ Bottom';
                 else if (r.found_in === 'inherited') locationLabel = '⬅️ Inherited';
                 else if (r.found_in === 'assumption') locationLabel = '📌 Assumption';
-                else if (r.found_in === 'ocr') locationLabel = '🖼️ OCR (raster)';
+                else if (r.found_in === 'ocr') locationLabel = '🖼️ OCR';
                 
                 html += `<tr>
                     <td>${r.page}</td>
                     <td class="${headerClass}">${header}</td>
-                    <td style="font-size: 0.9em; color: #4caf50;">${icaoCode}</td>
+                    <td>${note}</td>
                     <td style="font-size: 0.85em;">${locationLabel}</td>
                 </tr>`;
             });
