@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JeppTEST NoAI - Local Parser</title>
+    <title>JeppTEST2 - Smart PDF Analyzer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         * {
@@ -45,7 +45,7 @@
             border-radius: 20px;
             font-size: 0.9em;
             font-weight: bold;
-            margin-bottom: 20px;
+            margin: 0 5px 20px 5px;
         }
         .upload-area {
             border: 3px dashed #667eea;
@@ -75,6 +75,7 @@
             font-weight: bold;
             cursor: pointer;
             transition: transform 0.2s;
+            margin-bottom: 10px;
         }
         button:hover:not(:disabled) {
             transform: scale(1.02);
@@ -102,6 +103,25 @@
             background: #ffebee;
             color: #d32f2f;
         }
+        .progress {
+            margin-top: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 30px;
+            display: none;
+        }
+        .progress-bar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9em;
+            transition: width 0.3s;
+        }
         .results {
             margin-top: 30px;
         }
@@ -125,70 +145,75 @@
         .results-table td {
             padding: 10px 12px;
             border-bottom: 1px solid #e0e0e0;
+            font-size: 0.9em;
         }
         .results-table tr:hover {
             background: #f5f5f5;
         }
-        .header-frontpage {
-            color: #9c27b0;
-            font-weight: bold;
+        .table-wrapper {
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 10px;
+            margin-top: 20px;
         }
-        .header-gen {
-            color: #2196f3;
-            font-weight: bold;
-        }
-        .header-enr {
-            color: #ff9800;
-            font-weight: bold;
-        }
-        .header-ad {
+        .status-vector {
             color: #4caf50;
             font-weight: bold;
         }
-        .header-unknown {
+        .status-raster {
+            color: #ff9800;
+            font-weight: bold;
+        }
+        .status-empty {
             color: #f44336;
             font-weight: bold;
         }
-        .location {
+        .text-preview {
+            font-family: monospace;
             font-size: 0.85em;
-            color: #999;
-        }
-        .table-wrapper {
-            max-height: 600px;
-            overflow-y: auto;
-            border-radius: 10px;
-        }
-        .progress {
-            margin-top: 20px;
-            background: #e0e0e0;
-            border-radius: 10px;
+            color: #666;
+            max-width: 400px;
             overflow: hidden;
-            height: 30px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
-        .progress-bar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
+        .summary-box {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .summary-item {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .summary-value {
+            font-size: 2em;
             font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .summary-label {
+            color: #666;
             font-size: 0.9em;
-            transition: width 0.3s;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- WAŻNE: Za każdym razem gdy modyfikujesz ten plik HTML, ZAKTUALIZUJ numer wersji poniżej! -->
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v2.1 NoAI</div>
-        <h1>JeppTEST NoAI</h1>
-        <p class="subtitle">Local PDF Parser - No API Required</p>
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v2.0 Smart</div>
+        <h1>JeppTEST2</h1>
+        <p class="subtitle">Smart PDF Analyzer - Text Priority + OCR Fallback</p>
         <div style="text-align: center;">
-            <span class="badge">⚡ FAST</span>
-            <span class="badge">🎯 ACCURATE</span>
-            <span class="badge">💰 FREE</span>
-            <span class="badge">🔒 OFFLINE</span>
+            <span class="badge">📄 PDF.js First</span>
+            <span class="badge">👁️ OCR Fallback</span>
+            <span class="badge">🤖 AI Ready</span>
         </div>
 
         <div class="upload-area" id="uploadArea">
@@ -199,7 +224,7 @@
 
         <button id="analyzeBtn" disabled>Load PDF to begin</button>
 
-        <div id="progress" class="progress" style="display: none;">
+        <div id="progress" class="progress">
             <div id="progressBar" class="progress-bar">0%</div>
         </div>
 
@@ -216,6 +241,7 @@
         window.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); }, false);
 
         let selectedFile = null;
+        let analysisData = null;
 
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
@@ -263,7 +289,7 @@
                 <div style="color: #6b7280; font-size: 0.85em; margin-top: 4px;">${(file.size / 1024 / 1024).toFixed(2)} MB</div>
             `;
             analyzeBtn.disabled = false;
-            analyzeBtn.textContent = 'Analyze Headers (Local - No AI)';
+            analyzeBtn.textContent = 'Analyze PDF Structure';
         }
 
         analyzeBtn.addEventListener('click', async () => {
@@ -279,9 +305,12 @@
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 const totalPages = pdf.numPages;
 
-                showStatus('info', `Analyzing ${totalPages} pages...`);
+                showStatus('info', `Extracting text from ${totalPages} pages...`);
                 
-                const results = [];
+                const pages = [];
+                let vectorCount = 0;
+                let rasterCount = 0;
+                let emptyCount = 0;
                 
                 for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
                     // Update progress
@@ -292,25 +321,49 @@
                     const page = await pdf.getPage(pageNum);
                     const textContent = await page.getTextContent();
                     
-                    // Wyciągnij tekst jako linie
-                    const lines = textContent.items
-                        .sort((a, b) => {
-                            // Sortuj po Y (góra -> dół), potem po X (lewo -> prawo)
-                            const yDiff = Math.abs(b.transform[5] - a.transform[5]);
-                            if (yDiff > 5) return b.transform[5] - a.transform[5];
-                            return a.transform[4] - b.transform[4];
-                        })
-                        .map(item => item.str.trim())
-                        .filter(str => str.length > 0);
+                    // Wyciągnij tekst
+                    const text = textContent.items
+                        .map(item => item.str)
+                        .join(' ')
+                        .trim();
                     
-                    // Bierzemy tylko 2 pierwsze i 2 ostatnie linijki
-                    const header = detectHeader(pageNum, '', lines);
-                    results.push(header);
+                    const charCount = text.length;
+                    let status;
+                    
+                    if (charCount > 50) {
+                        // Ma dużo tekstu - strona wektorowa
+                        status = 'VECTOR';
+                        vectorCount++;
+                    } else if (charCount > 0) {
+                        // Ma trochę tekstu (np. numery stron) - może być rastrowa
+                        status = 'RASTER';
+                        rasterCount++;
+                    } else {
+                        // Brak tekstu - definitywnie rastrowa
+                        status = 'RASTER';
+                        rasterCount++;
+                    }
+                    
+                    pages.push({
+                        pageNum,
+                        text,
+                        charCount,
+                        status,
+                        preview: text.substring(0, 100) + (text.length > 100 ? '...' : '')
+                    });
                 }
 
+                analysisData = {
+                    totalPages,
+                    vectorCount,
+                    rasterCount,
+                    emptyCount,
+                    pages
+                };
+
                 progressDiv.style.display = 'none';
-                showStatus('success', `Analysis complete! Analyzed ${totalPages} pages in ${(performance.now() / 1000).toFixed(1)}s`);
-                displayResults(results);
+                showStatus('success', `Analysis complete! Found ${vectorCount} vector pages, ${rasterCount} raster/mixed pages`);
+                displayResults();
 
             } catch (error) {
                 progressDiv.style.display = 'none';
@@ -322,129 +375,69 @@
             }
         });
 
-        function detectHeader(pageNum, text, allLines) {
-            // ZASADA: Strona 1 to ZAWSZE FRONT PAGE
-            if (pageNum === 1) {
-                return { page: pageNum, header: 'FRONT PAGE', location: 'page 1' };
-            }
-            
-            // Regex patterns
-            const genPattern = /GEN\s+(\d+)\.(\d+)/i;
-            const enrPattern = /ENR\s+(\d+)\.(\d+)/i;
-            const adPattern = /AD\s+(\d+)\.(\d+)/i;
-            
-            let location = 'not found';
-            
-            // Sprawdź TYLKO 2 pierwsze linijki (góra)
-            const topText = allLines.slice(0, 2).join(' ');
-            let match;
-            
-            if (match = topText.match(genPattern)) {
-                return { page: pageNum, header: `GEN ${match[1]}.${match[2]}`, location: 'top' };
-            }
-            if (match = topText.match(enrPattern)) {
-                return { page: pageNum, header: `ENR ${match[1]}.${match[2]}`, location: 'top' };
-            }
-            if (match = topText.match(adPattern)) {
-                return { page: pageNum, header: `AD ${match[1]}.${match[2]}`, location: 'top' };
-            }
-            
-            // Sprawdź TYLKO 2 ostatnie linijki (dół)
-            const bottomText = allLines.slice(-2).join(' ');
-            
-            if (match = bottomText.match(genPattern)) {
-                return { page: pageNum, header: `GEN ${match[1]}.${match[2]}`, location: 'bottom' };
-            }
-            if (match = bottomText.match(enrPattern)) {
-                return { page: pageNum, header: `ENR ${match[1]}.${match[2]}`, location: 'bottom' };
-            }
-            if (match = bottomText.match(adPattern)) {
-                return { page: pageNum, header: `AD ${match[1]}.${match[2]}`, location: 'bottom' };
-            }
-            
-            // Jeśli nic nie znaleziono
-            if (pageNum === 2 || pageNum === 3) {
-                return { page: pageNum, header: 'FRONT PAGE', location: 'assumption' };
-            }
-            
-            return { page: pageNum, header: 'UNKNOWN', location: 'not found' };
-        }
-
         function showStatus(type, message) {
             statusDiv.className = `status ${type}`;
             statusDiv.textContent = message;
         }
 
-        function displayResults(results) {
-            let html = '<h3 style="margin-bottom: 15px; color: #667eea;">Header Analysis Results:</h3>';
+        function displayResults() {
+            if (!analysisData) return;
+
+            const { totalPages, vectorCount, rasterCount, pages } = analysisData;
+
+            let html = '<h3 style="margin-bottom: 15px; color: #667eea;">PDF Structure Analysis:</h3>';
+            
+            // Summary boxes
+            html += '<div class="summary-box">';
+            html += `
+                <div class="summary-item">
+                    <div class="summary-value">${totalPages}</div>
+                    <div class="summary-label">Total Pages</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" style="color: #4caf50;">${vectorCount}</div>
+                    <div class="summary-label">✓ Vector (Has Text)</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" style="color: #ff9800;">${rasterCount}</div>
+                    <div class="summary-label">👁️ Raster (Needs OCR)</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" style="color: #667eea;">${Math.round((vectorCount/totalPages)*100)}%</div>
+                    <div class="summary-label">Text Coverage</div>
+                </div>
+            `;
+            html += '</div>';
+
+            // Table
             html += '<div class="table-wrapper">';
             html += '<table class="results-table">';
-            html += '<thead><tr><th style="width: 80px;">Page</th><th>Detected Header</th><th style="width: 120px;">Location</th></tr></thead>';
+            html += '<thead><tr><th style="width: 80px;">Page</th><th style="width: 120px;">Status</th><th style="width: 100px;">Characters</th><th>Text Preview</th></tr></thead>';
             html += '<tbody>';
             
-            results.forEach(r => {
-                const header = r.header || 'UNKNOWN';
-                let headerClass = 'header-unknown';
-                
-                if (header === 'FRONT PAGE') headerClass = 'header-frontpage';
-                else if (header.startsWith('GEN')) headerClass = 'header-gen';
-                else if (header.startsWith('ENR')) headerClass = 'header-enr';
-                else if (header.startsWith('AD')) headerClass = 'header-ad';
-                
-                const locationEmoji = r.location === 'top' ? '⬆️ Top (2 lines)' : 
-                                     r.location === 'bottom' ? '⬇️ Bottom (2 lines)' : 
-                                     r.location === 'page 1' ? '📄 Page 1 (always)' :
-                                     r.location === 'assumption' ? '📌 Assumed (pg 2-3)' : '❓ Not found';
+            pages.forEach(p => {
+                const statusClass = p.status === 'VECTOR' ? 'status-vector' : 'status-raster';
+                const statusText = p.status === 'VECTOR' ? '✓ VECTOR' : '👁️ RASTER (OCR)';
                 
                 html += `<tr>
-                    <td>${r.page}</td>
-                    <td class="${headerClass}">${header}</td>
-                    <td class="location">${locationEmoji}</td>
+                    <td><strong>${p.pageNum}</strong></td>
+                    <td class="${statusClass}">${statusText}</td>
+                    <td>${p.charCount}</td>
+                    <td class="text-preview">${p.preview || '<em>no text</em>'}</td>
                 </tr>`;
             });
             
             html += '</tbody></table>';
             html += '</div>';
-            
-            // Summary
-            const summary = {};
-            const locationStats = { top: 0, bottom: 0, page1: 0, notFound: 0 };
-            
-            results.forEach(r => {
-                const h = r.header || 'UNKNOWN';
-                summary[h] = (summary[h] || 0) + 1;
-                
-                if (r.location === 'top') locationStats.top++;
-                else if (r.location === 'bottom') locationStats.bottom++;
-                else if (r.location === 'page 1') locationStats.page1++;
-                else if (r.location === 'not found') locationStats.notFound++;
-            });
-            
-            html += '<div style="margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 10px;">';
-            html += '<h4 style="margin-bottom: 10px; color: #667eea;">Summary:</h4>';
-            html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">';
-            
-            // Headers count
-            html += '<div>';
-            html += '<strong>Headers found:</strong><br>';
-            html += '<div style="font-family: monospace; font-size: 0.9em; margin-top: 5px;">';
-            Object.keys(summary).sort().forEach(key => {
-                html += `<div>${key}: <strong>${summary[key]}</strong></div>`;
-            });
-            html += '</div></div>';
-            
-            // Location stats
-            html += '<div>';
-            html += '<strong>Header locations:</strong><br>';
-            html += '<div style="font-family: monospace; font-size: 0.9em; margin-top: 5px;">';
-            html += `<div>📄 Page 1: <strong>${locationStats.page1}</strong></div>`;
-            html += `<div>⬆️ Top (2 lines): <strong>${locationStats.top}</strong></div>`;
-            html += `<div>⬇️ Bottom (2 lines): <strong>${locationStats.bottom}</strong></div>`;
-            html += `<div>❓ Not found: <strong>${locationStats.notFound}</strong></div>`;
-            html += '</div></div>';
-            
-            html += '</div></div>';
-            
+
+            // Info box
+            html += '<div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 10px; border-left: 4px solid #667eea;">';
+            html += '<strong>📋 Ready for AI Analysis:</strong><br>';
+            html += `• ${vectorCount} pages with extracted text (will be sent as text)<br>`;
+            html += `• ${rasterCount} pages need OCR (AI will analyze images)<br>`;
+            html += `• Total ${totalPages} pages ready to send to Gemini`;
+            html += '</div>';
+
             resultsDiv.innerHTML = html;
         }
     </script>
