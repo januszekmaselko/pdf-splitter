@@ -221,19 +221,41 @@
 </head>
 <body>
     <div class="container">
-        <div class="version">v3.0 Batch</div>
+        <div class="version">v3.1 Dual-AI</div>
         <h1>JeppTEST3</h1>
-        <p class="subtitle">Batch Processor - 50 Pages at a Time with Context Inheritance</p>
+        <p class="subtitle">Batch Processor - Choose Gemini or Claude - 50 Pages with Context</p>
         <div style="text-align: center;">
             <span class="badge">📦 BATCHED</span>
             <span class="badge">🔗 CONTEXT</span>
-            <span class="badge">🎯 ACCURATE</span>
-            <span class="badge">💪 HANDLES LONG DOCS</span>
+            <span class="badge">🤖 DUAL AI</span>
+            <span class="badge">💪 LONG DOCS</span>
         </div>
 
         <div class="api-key-container">
-            <label>Gemini API Key: <span style="color: #4caf50; font-size: 0.85em;">(domyślny klucz załadowany)</span></label>
-            <input type="text" id="apiKey" placeholder="Opcjonalnie: wklej inny klucz Gemini API" value="AIzaSyCR8xuBmxNo6znaGmGvKBXk9rZN-wwDOkk">
+            <label>Select AI Provider:</label>
+            <div style="margin: 10px 0;">
+                <label style="display: inline-flex; align-items: center; margin-right: 20px; cursor: pointer;">
+                    <input type="radio" name="aiProvider" value="gemini" checked style="display: inline-block; margin-right: 8px; width: auto;">
+                    <span>🔷 Gemini (Google)</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                    <input type="radio" name="aiProvider" value="claude" style="display: inline-block; margin-right: 8px; width: auto;">
+                    <span>🟣 Claude (Anthropic)</span>
+                </label>
+            </div>
+            
+            <div id="geminiKey" style="margin-top: 10px;">
+                <label>Gemini API Key: <span style="color: #4caf50; font-size: 0.85em;">(domyślny klucz załadowany)</span></label>
+                <input type="text" id="apiKeyGemini" placeholder="Opcjonalnie: wklej inny klucz Gemini API" value="AIzaSyCR8xuBmxNo6znaGmGvKBXk9rZN-wwDOkk">
+            </div>
+            
+            <div id="claudeKey" style="margin-top: 10px; display: none;">
+                <label>Claude API Key (Anthropic): <span style="color: #ff9800; font-size: 0.85em;">(wpisz swój klucz)</span></label>
+                <input type="text" id="apiKeyClaude" placeholder="sk-ant-api03-...">
+                <div style="margin-top: 8px; font-size: 0.85em; color: #666;">
+                    ℹ️ Claude ma lepszy OCR i lepiej radzi sobie z nagłówkami w dokumentach.
+                </div>
+            </div>
         </div>
 
         <div class="upload-area" id="uploadArea">
@@ -273,9 +295,27 @@
         const resultsDiv = document.getElementById('results');
         const progressDiv = document.getElementById('progress');
         const progressBar = document.getElementById('progressBar');
-        const apiKeyInput = document.getElementById('apiKey');
+        const apiKeyGeminiInput = document.getElementById('apiKeyGemini');
+        const apiKeyClaudeInput = document.getElementById('apiKeyClaude');
         const batchInfoDiv = document.getElementById('batchInfo');
         const batchListDiv = document.getElementById('batchList');
+
+        // Toggle między Gemini i Claude key inputs
+        const aiProviderRadios = document.getElementsByName('aiProvider');
+        const geminiKeyDiv = document.getElementById('geminiKey');
+        const claudeKeyDiv = document.getElementById('claudeKey');
+
+        aiProviderRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if (e.target.value === 'gemini') {
+                    geminiKeyDiv.style.display = 'block';
+                    claudeKeyDiv.style.display = 'none';
+                } else {
+                    geminiKeyDiv.style.display = 'none';
+                    claudeKeyDiv.style.display = 'block';
+                }
+            });
+        });
 
         uploadArea.addEventListener('click', () => fileInput.click());
 
@@ -321,9 +361,14 @@
         analyzeBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
-            const apiKey = apiKeyInput.value.trim();
+            // Sprawdź który AI provider został wybrany
+            const selectedProvider = document.querySelector('input[name="aiProvider"]:checked').value;
+            const apiKey = selectedProvider === 'gemini' 
+                ? apiKeyGeminiInput.value.trim() 
+                : apiKeyClaudeInput.value.trim();
+
             if (!apiKey) {
-                showStatus('error', 'Wprowadź klucz API Gemini!');
+                showStatus('error', `Wprowadź klucz API ${selectedProvider === 'gemini' ? 'Gemini' : 'Claude'}!`);
                 return;
             }
 
@@ -386,16 +431,22 @@
                     const batchPdfBytes = await batchPdf.save();
                     const batchBase64 = arrayBufferToBase64(batchPdfBytes);
 
-                    // Wyślij do Gemini z kontekstem
+                    // Wyślij do AI z kontekstem
                     const contextInfo = lastSection 
                         ? `CONTEXT FROM PREVIOUS BATCH: Last section was "${lastSection}"${lastSubsection ? `, subsection "${lastSubsection}"` : ''}. If first pages of this batch have no header, they likely belong to "${lastSection}".`
                         : 'This is the FIRST batch.';
 
-                    const batchResults = await analyzeWithGemini(batchBase64, apiKey, actualStartPage, actualEndPage, contextInfo, batchIdx === 0);
+                    const batchResults = selectedProvider === 'gemini'
+                        ? await analyzeWithGemini(batchBase64, apiKey, actualStartPage, actualEndPage, contextInfo, batchIdx === 0)
+                        : await analyzeWithClaude(batchBase64, apiKey, actualStartPage, actualEndPage, contextInfo, batchIdx === 0);
 
-                    // Popraw numery stron (są względne w batchu, muszą być absolutne)
+                    // Popraw numery stron - AI powinno zwracać relatywne (1-50), konwertujemy na absolutne
                     batchResults.results.forEach(r => {
-                        r.page = r.page + startPage; // Konwertuj z relatywnego na absolutny
+                        // Jeśli AI zwróciło relatywny numer (1-50), konwertuj na absolutny
+                        if (r.page <= BATCH_SIZE) {
+                            r.page = r.page + startPage;
+                        }
+                        // Jeśli AI zwróciło już absolutny (startPage+), zostaw
                     });
 
                     allResults.push(...batchResults.results);
@@ -432,6 +483,188 @@
         }
 
         async function analyzeWithGemini(base64Data, apiKey, startPage, endPage, contextInfo, isFirstBatch) {
+            const prompt = `You are analyzing a BATCH of an AIP AMDT document.
+
+${contextInfo}
+
+BATCH INFO:
+- This batch contains pages ${startPage} to ${endPage} (inclusive)
+- Page numbers in your response should be RELATIVE (1 to ${endPage - startPage + 1})
+
+${isFirstBatch ? 'IMPORTANT: Page 1 of this batch is ALWAYS "FRONT PAGE".' : ''}
+
+ALGORITHM:
+1. For EACH page in this batch, find the section header:
+   - Look in TOP-1 or TOP-2 lines for: GEN X.Y, ENR X.Y, AD X.Y
+   - OR look for ICAO code (4 capital letters like EYKA, EYPA, LROP)
+   
+2. If page has NO header:
+   - Inherit section from previous page
+   ${!isFirstBatch ? '- If it\'s the FIRST page of this batch, inherit from context above' : ''}
+
+3. For AD 2.x pages, find ICAO code in top 5 lines
+   - Use ICAO as section name (not "AD 2.X")
+   - Example: if you see "AD 2.12" and "EYKA" → section = "EYKA", note = "AD 2.12"
+
+4. Extract section number cleanly:
+   - "GEN 0.4-1" → "GEN 0.4"
+   - "EYKA AD 2.24-01-1" → "EYKA"
+
+Return JSON in this EXACT format:
+{
+  "results": [
+    {"page": 1, "header": "FRONT PAGE", "found_in": "assumption"},
+    {"page": 2, "header": "GEN 0.4", "found_in": "top1"},
+    {"page": 3, "header": "GEN 0.4", "found_in": "inherited"},
+    {"page": 15, "header": "EYKA", "found_in": "top1", "note": "AD 2.12"}
+  ],
+  "last_section": "EYKA",
+  "last_subsection": "AD 2.12"
+}
+
+CRITICAL: Include ALL pages from ${startPage} to ${endPage}. Every page must be in results array.`;
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: prompt },
+                            {
+                                inline_data: {
+                                    mime_type: "application/pdf",
+                                    data: base64Data
+                                }
+                            }
+                        ]
+                    }],
+                    generationConfig: {
+                        temperature: 0.1,
+                        maxOutputTokens: 8000
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(`Gemini API error: ${error.error?.message || 'Unknown error'}`);
+            }
+
+            const data = await response.json();
+            const text = data.candidates[0].content.parts[0].text;
+            
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error('AI did not return valid JSON');
+            }
+
+            const parsed = JSON.parse(jsonMatch[0]);
+            return {
+                results: parsed.results || [],
+                last_section: parsed.last_section || null,
+                last_subsection: parsed.last_subsection || null
+            };
+        }
+
+        async function analyzeWithClaude(base64Data, apiKey, startPage, endPage, contextInfo, isFirstBatch) {
+            const prompt = `You are analyzing a BATCH of an AIP AMDT document.
+
+${contextInfo}
+
+BATCH INFO:
+- This batch contains pages ${startPage} to ${endPage} (inclusive)
+- Page numbers in your response should be RELATIVE (1 to ${endPage - startPage + 1})
+
+${isFirstBatch ? 'IMPORTANT: Page 1 of this batch is ALWAYS "FRONT PAGE".' : ''}
+
+ALGORITHM:
+1. For EACH page in this batch, find the section header:
+   - Look carefully at the TOP of each page for: GEN X.Y, ENR X.Y, AD X.Y
+   - OR look for ICAO code (4 capital letters like EYKA, EYPA, LROP, LBSP)
+   - Headers are usually in the top-left or top-center of the page
+   
+2. If page has NO visible header:
+   - Inherit section from previous page
+   ${!isFirstBatch ? '- If it\'s the FIRST page of this batch, inherit from context above' : ''}
+
+3. For AD 2.x pages, find ICAO code in top portion of page
+   - Use ICAO as section name (not "AD 2.X")
+   - Example: if you see "AD 2.12" and "EYKA" → section = "EYKA", note = "AD 2.12"
+
+4. Extract section number cleanly:
+   - "GEN 0.4-1" → "GEN 0.4"
+   - "EYKA AD 2.24-01-1" → "EYKA"
+   - "ENR 1.4 - 4" → "ENR 1.4"
+
+IMPORTANT: Only mark as "inherited" if there is truly NO header visible on the page. Most pages WILL have headers.
+
+Return JSON in this EXACT format:
+{
+  "results": [
+    {"page": 1, "header": "FRONT PAGE", "found_in": "assumption"},
+    {"page": 2, "header": "GEN 0.4", "found_in": "top1"},
+    {"page": 3, "header": "GEN 0.4", "found_in": "top1"},
+    {"page": 15, "header": "EYKA", "found_in": "top1", "note": "AD 2.12"}
+  ],
+  "last_section": "EYKA",
+  "last_subsection": "AD 2.12"
+}
+
+CRITICAL: Include ALL pages from 1 to ${endPage - startPage + 1}. Every page must be in results array.`;
+
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                    model: 'claude-3-5-sonnet-20241022',
+                    max_tokens: 8000,
+                    messages: [{
+                        role: 'user',
+                        content: [
+                            {
+                                type: 'document',
+                                source: {
+                                    type: 'base64',
+                                    media_type: 'application/pdf',
+                                    data: base64Data
+                                }
+                            },
+                            {
+                                type: 'text',
+                                text: prompt
+                            }
+                        ]
+                    }]
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(`Claude API error: ${error.error?.message || 'Unknown error'}`);
+            }
+
+            const data = await response.json();
+            const text = data.content[0].text;
+            
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error('Claude did not return valid JSON');
+            }
+
+            const parsed = JSON.parse(jsonMatch[0]);
+            return {
+                results: parsed.results || [],
+                last_section: parsed.last_section || null,
+                last_subsection: parsed.last_subsection || null
+            };
+        }
             const prompt = `You are analyzing a BATCH of an AIP AMDT document.
 
 ${contextInfo}
