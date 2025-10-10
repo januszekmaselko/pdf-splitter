@@ -70,8 +70,20 @@
             border-color: #764ba2;
             background: #f0f2ff;
         }
-        input[type="file"], input[type="text"] {
+        .upload-area.dragover {
+            background: #e8ebff;
+            border-color: #5a67d8;
+        }
+        input[type="file"] {
             display: none;
+        }
+        input[type="text"] {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.9em;
         }
         .api-key-container {
             margin-bottom: 20px;
@@ -85,14 +97,6 @@
             margin-bottom: 8px;
             color: #667eea;
             font-weight: bold;
-        }
-        .api-key-container input[type="text"] {
-            display: block;
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 0.9em;
         }
         button {
             width: 100%;
@@ -221,7 +225,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="version">v3.1 Dual-AI</div>
+        <div class="version">v3.2 Fixed</div>
         <h1>JeppTEST3</h1>
         <p class="subtitle">Batch Processor - Choose Gemini or Claude - 50 Pages with Context</p>
         <div style="text-align: center;">
@@ -280,11 +284,19 @@
     </div>
 
     <script>
+        // Prevent default PDF opening behavior
+        document.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }, false);
+        
+        document.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }, false);
+
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         const { PDFDocument } = PDFLib;
-
-        window.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); }, false);
-        window.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); }, false);
 
         let selectedFile = null;
 
@@ -305,8 +317,8 @@
         const geminiKeyDiv = document.getElementById('geminiKey');
         const claudeKeyDiv = document.getElementById('claudeKey');
 
-        aiProviderRadios.forEach(radio => {
-            radio.addEventListener('change', (e) => {
+        aiProviderRadios.forEach(function(radio) {
+            radio.addEventListener('change', function(e) {
                 if (e.target.value === 'gemini') {
                     geminiKeyDiv.style.display = 'block';
                     claudeKeyDiv.style.display = 'none';
@@ -317,24 +329,26 @@
             });
         });
 
-        uploadArea.addEventListener('click', () => fileInput.click());
-
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            uploadArea.style.background = '#e8ebff';
+        uploadArea.addEventListener('click', function() { 
+            fileInput.click(); 
         });
 
-        uploadArea.addEventListener('dragleave', (e) => {
+        uploadArea.addEventListener('dragover', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            uploadArea.style.background = '#f8f9ff';
+            uploadArea.classList.add('dragover');
         });
 
-        uploadArea.addEventListener('drop', (e) => {
+        uploadArea.addEventListener('dragleave', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            uploadArea.style.background = '#f8f9ff';
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('dragover');
             const file = e.dataTransfer.files[0];
             if (file && file.type === 'application/pdf') {
                 handleFile(file);
@@ -343,32 +357,28 @@
             }
         });
 
-        fileInput.addEventListener('change', (e) => {
+        fileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) handleFile(file);
         });
 
         function handleFile(file) {
             selectedFile = file;
-            uploadArea.innerHTML = `
-                <div style="color: #4ade80; font-weight: 500;">✓ ${file.name}</div>
-                <div style="color: #6b7280; font-size: 0.85em; margin-top: 4px;">${(file.size / 1024 / 1024).toFixed(2)} MB</div>
-            `;
+            uploadArea.innerHTML = '<div style="color: #4ade80; font-weight: 500;">✓ ' + file.name + '</div><div style="color: #6b7280; font-size: 0.85em; margin-top: 4px;">' + (file.size / 1024 / 1024).toFixed(2) + ' MB</div>';
             analyzeBtn.disabled = false;
             analyzeBtn.textContent = 'Analyze with Batch Processing';
         }
 
-        analyzeBtn.addEventListener('click', async () => {
+        analyzeBtn.addEventListener('click', async function() {
             if (!selectedFile) return;
 
-            // Sprawdź który AI provider został wybrany
             const selectedProvider = document.querySelector('input[name="aiProvider"]:checked').value;
             const apiKey = selectedProvider === 'gemini' 
                 ? apiKeyGeminiInput.value.trim() 
                 : apiKeyClaudeInput.value.trim();
 
             if (!apiKey) {
-                showStatus('error', `Wprowadź klucz API ${selectedProvider === 'gemini' ? 'Gemini' : 'Claude'}!`);
+                showStatus('error', 'Wprowadź klucz API ' + (selectedProvider === 'gemini' ? 'Gemini' : 'Claude') + '!');
                 return;
             }
 
@@ -378,27 +388,24 @@
             resultsDiv.innerHTML = '';
 
             try {
-                showStatus('info', '📄 Loading PDF...');
+                showStatus('info', '📄 Loading PDF... (Using ' + (selectedProvider === 'gemini' ? '🔷 Gemini' : '🟣 Claude') + ')');
                 const arrayBuffer = await selectedFile.arrayBuffer();
                 const pdfDoc = await PDFDocument.load(arrayBuffer);
                 const totalPages = pdfDoc.getPageCount();
 
-                // Oblicz ile batchy będzie
                 const BATCH_SIZE = 50;
                 const numBatches = Math.ceil(totalPages / BATCH_SIZE);
                 
-                showStatus('info', `📦 Document has ${totalPages} pages. Will process in ${numBatches} batches of ${BATCH_SIZE} pages.`);
+                showStatus('info', '📦 Document has ' + totalPages + ' pages. Will process in ' + numBatches + ' batches using ' + (selectedProvider === 'gemini' ? 'Gemini' : 'Claude') + '.');
 
-                // Przygotuj listę batchy
                 let batchHTML = '';
                 for (let i = 0; i < numBatches; i++) {
                     const startPage = i * BATCH_SIZE + 1;
                     const endPage = Math.min((i + 1) * BATCH_SIZE, totalPages);
-                    batchHTML += `<div class="batch-item" id="batch${i}">Batch ${i + 1}: Pages ${startPage}-${endPage} (waiting...)</div>`;
+                    batchHTML += '<div class="batch-item" id="batch' + i + '">Batch ' + (i + 1) + ': Pages ' + startPage + '-' + endPage + ' (waiting...)</div>';
                 }
                 batchListDiv.innerHTML = batchHTML;
 
-                // Przetwarzaj każdy batch
                 const allResults = [];
                 let lastSection = null;
                 let lastSubsection = null;
@@ -406,19 +413,17 @@
                 for (let batchIdx = 0; batchIdx < numBatches; batchIdx++) {
                     const startPage = batchIdx * BATCH_SIZE;
                     const endPage = Math.min((batchIdx + 1) * BATCH_SIZE, totalPages);
-                    const actualStartPage = startPage + 1; // Human-readable
-                    const actualEndPage = endPage; // Human-readable
+                    const actualStartPage = startPage + 1;
+                    const actualEndPage = endPage;
 
-                    // Oznacz batch jako przetwarzany
-                    const batchDiv = document.getElementById(`batch${batchIdx}`);
+                    const batchDiv = document.getElementById('batch' + batchIdx);
                     batchDiv.className = 'batch-item processing';
-                    batchDiv.textContent = `Batch ${batchIdx + 1}: Pages ${actualStartPage}-${actualEndPage} (processing...)`;
+                    batchDiv.textContent = 'Batch ' + (batchIdx + 1) + ': Pages ' + actualStartPage + '-' + actualEndPage + ' (processing...)';
 
                     progressBar.style.width = Math.round((batchIdx / numBatches) * 100) + '%';
-                    progressBar.textContent = `Batch ${batchIdx + 1}/${numBatches}`;
+                    progressBar.textContent = 'Batch ' + (batchIdx + 1) + '/' + numBatches;
 
-                    // Stwórz mini-PDF dla tego batcha
-                    showStatus('info', `📦 Processing Batch ${batchIdx + 1}/${numBatches} (pages ${actualStartPage}-${actualEndPage})...`);
+                    showStatus('info', '📦 Processing Batch ' + (batchIdx + 1) + '/' + numBatches + ' (pages ' + actualStartPage + '-' + actualEndPage + ')...');
                     
                     const batchPdf = await PDFDocument.create();
                     const pagesToCopy = [];
@@ -426,40 +431,35 @@
                         pagesToCopy.push(i);
                     }
                     const copiedPages = await batchPdf.copyPages(pdfDoc, pagesToCopy);
-                    copiedPages.forEach(page => batchPdf.addPage(page));
+                    copiedPages.forEach(function(page) { batchPdf.addPage(page); });
 
                     const batchPdfBytes = await batchPdf.save();
                     const batchBase64 = arrayBufferToBase64(batchPdfBytes);
 
-                    // Wyślij do AI z kontekstem
                     const contextInfo = lastSection 
-                        ? `CONTEXT FROM PREVIOUS BATCH: Last section was "${lastSection}"${lastSubsection ? `, subsection "${lastSubsection}"` : ''}. If first pages of this batch have no header, they likely belong to "${lastSection}".`
+                        ? 'CONTEXT FROM PREVIOUS BATCH: Last section was "' + lastSection + '"' + (lastSubsection ? ', subsection "' + lastSubsection + '"' : '') + '. If first pages of this batch have no header, they likely belong to "' + lastSection + '".'
                         : 'This is the FIRST batch.';
 
                     const batchResults = selectedProvider === 'gemini'
                         ? await analyzeWithGemini(batchBase64, apiKey, actualStartPage, actualEndPage, contextInfo, batchIdx === 0)
                         : await analyzeWithClaude(batchBase64, apiKey, actualStartPage, actualEndPage, contextInfo, batchIdx === 0);
 
-                    // Popraw numery stron - AI powinno zwracać relatywne (1-50), konwertujemy na absolutne
-                    batchResults.results.forEach(r => {
-                        // Jeśli AI zwróciło relatywny numer (1-50), konwertuj na absolutny
+                    batchResults.results.forEach(function(r) {
                         if (r.page <= BATCH_SIZE) {
                             r.page = r.page + startPage;
                         }
-                        // Jeśli AI zwróciło już absolutny (startPage+), zostaw
                     });
 
                     allResults.push(...batchResults.results);
                     lastSection = batchResults.last_section;
                     lastSubsection = batchResults.last_subsection;
 
-                    // Oznacz batch jako ukończony
                     batchDiv.className = 'batch-item done';
-                    batchDiv.textContent = `Batch ${batchIdx + 1}: Pages ${actualStartPage}-${actualEndPage} ✓ (${batchResults.results.length} pages analyzed, last section: ${lastSection || 'none'})`;
+                    batchDiv.textContent = 'Batch ' + (batchIdx + 1) + ': Pages ' + actualStartPage + '-' + actualEndPage + ' ✓ (' + batchResults.results.length + ' pages analyzed, last section: ' + (lastSection || 'none') + ')';
                 }
 
                 progressDiv.style.display = 'none';
-                showStatus('success', `✅ Analysis complete! Analyzed all ${totalPages} pages in ${numBatches} batches.`);
+                showStatus('success', '✅ Analysis complete! Analyzed all ' + totalPages + ' pages in ' + numBatches + ' batches.');
                 displayResults(allResults, totalPages);
 
             } catch (error) {
@@ -483,48 +483,9 @@
         }
 
         async function analyzeWithGemini(base64Data, apiKey, startPage, endPage, contextInfo, isFirstBatch) {
-            const prompt = `You are analyzing a BATCH of an AIP AMDT document.
+            const prompt = 'You are analyzing a BATCH of an AIP AMDT document.\n\n' + contextInfo + '\n\nBATCH INFO:\n- This batch contains pages ' + startPage + ' to ' + endPage + ' (inclusive)\n- Page numbers in your response should be RELATIVE (1 to ' + (endPage - startPage + 1) + ')\n\n' + (isFirstBatch ? 'IMPORTANT: Page 1 of this batch is ALWAYS "FRONT PAGE".' : '') + '\n\nALGORITHM:\n1. For EACH page in this batch, find the section header:\n   - Look in TOP-1 or TOP-2 lines for: GEN X.Y, ENR X.Y, AD X.Y\n   - OR look for ICAO code (4 capital letters like EYKA, EYPA, LROP)\n   \n2. If page has NO header:\n   - Inherit section from previous page\n   ' + (!isFirstBatch ? '- If it\'s the FIRST page of this batch, inherit from context above' : '') + '\n\n3. For AD 2.x pages, find ICAO code in top 5 lines\n   - Use ICAO as section name (not "AD 2.X")\n   - Example: if you see "AD 2.12" and "EYKA" → section = "EYKA", note = "AD 2.12"\n\n4. Extract section number cleanly:\n   - "GEN 0.4-1" → "GEN 0.4"\n   - "EYKA AD 2.24-01-1" → "EYKA"\n\nReturn JSON in this EXACT format:\n{\n  "results": [\n    {"page": 1, "header": "FRONT PAGE", "found_in": "assumption"},\n    {"page": 2, "header": "GEN 0.4", "found_in": "top1"},\n    {"page": 3, "header": "GEN 0.4", "found_in": "inherited"},\n    {"page": 15, "header": "EYKA", "found_in": "top1", "note": "AD 2.12"}\n  ],\n  "last_section": "EYKA",\n  "last_subsection": "AD 2.12"\n}\n\nCRITICAL: Include ALL pages from ' + startPage + ' to ' + endPage + '. Every page must be in results array.';
 
-${contextInfo}
-
-BATCH INFO:
-- This batch contains pages ${startPage} to ${endPage} (inclusive)
-- Page numbers in your response should be RELATIVE (1 to ${endPage - startPage + 1})
-
-${isFirstBatch ? 'IMPORTANT: Page 1 of this batch is ALWAYS "FRONT PAGE".' : ''}
-
-ALGORITHM:
-1. For EACH page in this batch, find the section header:
-   - Look in TOP-1 or TOP-2 lines for: GEN X.Y, ENR X.Y, AD X.Y
-   - OR look for ICAO code (4 capital letters like EYKA, EYPA, LROP)
-   
-2. If page has NO header:
-   - Inherit section from previous page
-   ${!isFirstBatch ? '- If it\'s the FIRST page of this batch, inherit from context above' : ''}
-
-3. For AD 2.x pages, find ICAO code in top 5 lines
-   - Use ICAO as section name (not "AD 2.X")
-   - Example: if you see "AD 2.12" and "EYKA" → section = "EYKA", note = "AD 2.12"
-
-4. Extract section number cleanly:
-   - "GEN 0.4-1" → "GEN 0.4"
-   - "EYKA AD 2.24-01-1" → "EYKA"
-
-Return JSON in this EXACT format:
-{
-  "results": [
-    {"page": 1, "header": "FRONT PAGE", "found_in": "assumption"},
-    {"page": 2, "header": "GEN 0.4", "found_in": "top1"},
-    {"page": 3, "header": "GEN 0.4", "found_in": "inherited"},
-    {"page": 15, "header": "EYKA", "found_in": "top1", "note": "AD 2.12"}
-  ],
-  "last_section": "EYKA",
-  "last_subsection": "AD 2.12"
-}
-
-CRITICAL: Include ALL pages from ${startPage} to ${endPage}. Every page must be in results array.`;
-
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+            const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -550,7 +511,7 @@ CRITICAL: Include ALL pages from ${startPage} to ${endPage}. Every page must be 
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(`Gemini API error: ${error.error?.message || 'Unknown error'}`);
+                throw new Error('Gemini API error: ' + (error.error?.message || 'Unknown error'));
             }
 
             const data = await response.json();
@@ -570,50 +531,7 @@ CRITICAL: Include ALL pages from ${startPage} to ${endPage}. Every page must be 
         }
 
         async function analyzeWithClaude(base64Data, apiKey, startPage, endPage, contextInfo, isFirstBatch) {
-            const prompt = `You are analyzing a BATCH of an AIP AMDT document.
-
-${contextInfo}
-
-BATCH INFO:
-- This batch contains pages ${startPage} to ${endPage} (inclusive)
-- Page numbers in your response should be RELATIVE (1 to ${endPage - startPage + 1})
-
-${isFirstBatch ? 'IMPORTANT: Page 1 of this batch is ALWAYS "FRONT PAGE".' : ''}
-
-ALGORITHM:
-1. For EACH page in this batch, find the section header:
-   - Look carefully at the TOP of each page for: GEN X.Y, ENR X.Y, AD X.Y
-   - OR look for ICAO code (4 capital letters like EYKA, EYPA, LROP, LBSP)
-   - Headers are usually in the top-left or top-center of the page
-   
-2. If page has NO visible header:
-   - Inherit section from previous page
-   ${!isFirstBatch ? '- If it\'s the FIRST page of this batch, inherit from context above' : ''}
-
-3. For AD 2.x pages, find ICAO code in top portion of page
-   - Use ICAO as section name (not "AD 2.X")
-   - Example: if you see "AD 2.12" and "EYKA" → section = "EYKA", note = "AD 2.12"
-
-4. Extract section number cleanly:
-   - "GEN 0.4-1" → "GEN 0.4"
-   - "EYKA AD 2.24-01-1" → "EYKA"
-   - "ENR 1.4 - 4" → "ENR 1.4"
-
-IMPORTANT: Only mark as "inherited" if there is truly NO header visible on the page. Most pages WILL have headers.
-
-Return JSON in this EXACT format:
-{
-  "results": [
-    {"page": 1, "header": "FRONT PAGE", "found_in": "assumption"},
-    {"page": 2, "header": "GEN 0.4", "found_in": "top1"},
-    {"page": 3, "header": "GEN 0.4", "found_in": "top1"},
-    {"page": 15, "header": "EYKA", "found_in": "top1", "note": "AD 2.12"}
-  ],
-  "last_section": "EYKA",
-  "last_subsection": "AD 2.12"
-}
-
-CRITICAL: Include ALL pages from 1 to ${endPage - startPage + 1}. Every page must be in results array.`;
+            const prompt = 'You are analyzing a BATCH of an AIP AMDT document.\n\n' + contextInfo + '\n\nBATCH INFO:\n- This batch contains pages ' + startPage + ' to ' + endPage + ' (inclusive)\n- Page numbers in your response should be RELATIVE (1 to ' + (endPage - startPage + 1) + ')\n\n' + (isFirstBatch ? 'IMPORTANT: Page 1 of this batch is ALWAYS "FRONT PAGE".' : '') + '\n\nALGORITHM:\n1. For EACH page in this batch, find the section header:\n   - Look carefully at the TOP of each page for: GEN X.Y, ENR X.Y, AD X.Y\n   - OR look for ICAO code (4 capital letters like EYKA, EYPA, LROP, LBSP)\n   - Headers are usually in the top-left or top-center of the page\n   \n2. If page has NO visible header:\n   - Inherit section from previous page\n   ' + (!isFirstBatch ? '- If it\'s the FIRST page of this batch, inherit from context above' : '') + '\n\n3. For AD 2.x pages, find ICAO code in top portion of page\n   - Use ICAO as section name (not "AD 2.X")\n   - Example: if you see "AD 2.12" and "EYKA" → section = "EYKA", note = "AD 2.12"\n\n4. Extract section number cleanly:\n   - "GEN 0.4-1" → "GEN 0.4"\n   - "EYKA AD 2.24-01-1" → "EYKA"\n   - "ENR 1.4 - 4" → "ENR 1.4"\n\nIMPORTANT: Only mark as "inherited" if there is truly NO header visible on the page. Most pages WILL have headers.\n\nReturn JSON in this EXACT format:\n{\n  "results": [\n    {"page": 1, "header": "FRONT PAGE", "found_in": "assumption"},\n    {"page": 2, "header": "GEN 0.4", "found_in": "top1"},\n    {"page": 3, "header": "GEN 0.4", "found_in": "top1"},\n    {"page": 15, "header": "EYKA", "found_in": "top1", "note": "AD 2.12"}\n  ],\n  "last_section": "EYKA",\n  "last_subsection": "AD 2.12"\n}\n\nCRITICAL: Include ALL pages from 1 to ' + (endPage - startPage + 1) + '. Every page must be in results array.';
 
             const response = await fetch('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
@@ -647,7 +565,7 @@ CRITICAL: Include ALL pages from 1 to ${endPage - startPage + 1}. Every page mus
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(`Claude API error: ${error.error?.message || 'Unknown error'}`);
+                throw new Error('Claude API error: ' + (error.error?.message || 'Unknown error'));
             }
 
             const data = await response.json();
@@ -665,94 +583,9 @@ CRITICAL: Include ALL pages from 1 to ${endPage - startPage + 1}. Every page mus
                 last_subsection: parsed.last_subsection || null
             };
         }
-            const prompt = `You are analyzing a BATCH of an AIP AMDT document.
-
-${contextInfo}
-
-BATCH INFO:
-- This batch contains pages ${startPage} to ${endPage} (inclusive)
-- Page numbers in your response should be RELATIVE (1 to ${endPage - startPage + 1})
-
-${isFirstBatch ? 'IMPORTANT: Page 1 of this batch is ALWAYS "FRONT PAGE".' : ''}
-
-ALGORITHM:
-1. For EACH page in this batch, find the section header:
-   - Look in TOP-1 or TOP-2 lines for: GEN X.Y, ENR X.Y, AD X.Y
-   - OR look for ICAO code (4 capital letters like EYKA, EYPA, LROP)
-   
-2. If page has NO header:
-   - Inherit section from previous page
-   ${!isFirstBatch ? '- If it\'s the FIRST page of this batch, inherit from context above' : ''}
-
-3. For AD 2.x pages, find ICAO code in top 5 lines
-   - Use ICAO as section name (not "AD 2.X")
-   - Example: if you see "AD 2.12" and "EYKA" → section = "EYKA", note = "AD 2.12"
-
-4. Extract section number cleanly:
-   - "GEN 0.4-1" → "GEN 0.4"
-   - "EYKA AD 2.24-01-1" → "EYKA"
-
-Return JSON in this EXACT format:
-{
-  "results": [
-    {"page": 1, "header": "FRONT PAGE", "found_in": "assumption"},
-    {"page": 2, "header": "GEN 0.4", "found_in": "top1"},
-    {"page": 3, "header": "GEN 0.4", "found_in": "inherited"},
-    {"page": 15, "header": "EYKA", "found_in": "top1", "note": "AD 2.12"}
-  ],
-  "last_section": "EYKA",
-  "last_subsection": "AD 2.12"
-}
-
-CRITICAL: Include ALL pages from ${startPage} to ${endPage}. Every page must be in results array.`;
-
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: prompt },
-                            {
-                                inline_data: {
-                                    mime_type: "application/pdf",
-                                    data: base64Data
-                                }
-                            }
-                        ]
-                    }],
-                    generationConfig: {
-                        temperature: 0.1,
-                        maxOutputTokens: 8000
-                    }
-                })
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(`Gemini API error: ${error.error?.message || 'Unknown error'}`);
-            }
-
-            const data = await response.json();
-            const text = data.candidates[0].content.parts[0].text;
-            
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) {
-                throw new Error('AI did not return valid JSON');
-            }
-
-            const parsed = JSON.parse(jsonMatch[0]);
-            return {
-                results: parsed.results || [],
-                last_section: parsed.last_section || null,
-                last_subsection: parsed.last_subsection || null
-            };
-        }
 
         function showStatus(type, message) {
-            statusDiv.className = `status ${type}`;
+            statusDiv.className = 'status ' + type;
             statusDiv.innerHTML = message;
         }
 
@@ -764,7 +597,7 @@ CRITICAL: Include ALL pages from ${startPage} to ${endPage}. Every page must be 
             html += '<thead><tr><th style="width: 80px;">Page</th><th>Section</th><th style="width: 120px;">Note</th><th style="width: 150px;">Found In</th></tr></thead>';
             html += '<tbody>';
             
-            results.forEach(r => {
+            results.forEach(function(r) {
                 const header = r.header || 'UNKNOWN';
                 let headerClass = 'header-unknown';
                 
@@ -780,7 +613,7 @@ CRITICAL: Include ALL pages from ${startPage} to ${endPage}. Every page must be 
                     headerClass += ' header-inherited';
                 }
                 
-                const note = r.note ? `<span style="font-size: 0.85em; color: #666;">${r.note}</span>` : '—';
+                const note = r.note ? '<span style="font-size: 0.85em; color: #666;">' + r.note + '</span>' : '—';
                 
                 let locationLabel = '❓ Unknown';
                 if (r.found_in === 'top1') locationLabel = '⬆️ Line 1';
@@ -790,20 +623,14 @@ CRITICAL: Include ALL pages from ${startPage} to ${endPage}. Every page must be 
                 else if (r.found_in === 'assumption') locationLabel = '📌 Assumption';
                 else if (r.found_in === 'ocr') locationLabel = '🖼️ OCR';
                 
-                html += `<tr>
-                    <td>${r.page}</td>
-                    <td class="${headerClass}">${header}</td>
-                    <td>${note}</td>
-                    <td style="font-size: 0.85em;">${locationLabel}</td>
-                </tr>`;
+                html += '<tr><td>' + r.page + '</td><td class="' + headerClass + '">' + header + '</td><td>' + note + '</td><td style="font-size: 0.85em;">' + locationLabel + '</td></tr>';
             });
             
             html += '</tbody></table>';
             html += '</div>';
             
-            // Summary
             const summary = {};
-            results.forEach(r => {
+            results.forEach(function(r) {
                 const h = r.header || 'UNKNOWN';
                 summary[h] = (summary[h] || 0) + 1;
             });
@@ -811,10 +638,10 @@ CRITICAL: Include ALL pages from ${startPage} to ${endPage}. Every page must be 
             html += '<div style="margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 10px;">';
             html += '<h4 style="margin-bottom: 10px; color: #667eea;">📋 Section Summary:</h4>';
             html += '<div style="font-family: monospace; font-size: 0.9em;">';
-            Object.keys(summary).sort().forEach(key => {
-                html += `<div style="margin: 5px 0;">${key}: <strong>${summary[key]} pages</strong></div>`;
+            Object.keys(summary).sort().forEach(function(key) {
+                html += '<div style="margin: 5px 0;">' + key + ': <strong>' + summary[key] + ' pages</strong></div>';
             });
-            html += `<div style="margin-top: 10px; padding-top: 10px; border-top: 2px solid #ddd;">TOTAL: <strong>${results.length} pages</strong></div>`;
+            html += '<div style="margin-top: 10px; padding-top: 10px; border-top: 2px solid #ddd;">TOTAL: <strong>' + results.length + ' pages</strong></div>';
             html += '</div></div>';
             
             resultsDiv.innerHTML = html;
