@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AIP PDF Splitter - Darmowy</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <title>JeppTEST - Header Analyzer</title>
     <style>
         * {
             margin: 0;
@@ -18,7 +17,7 @@
             padding: 20px;
         }
         .container {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
@@ -40,20 +39,16 @@
         .upload-area {
             border: 3px dashed #667eea;
             border-radius: 15px;
-            padding: 60px 20px;
+            padding: 40px 20px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             background: #f8f9ff;
         }
         .upload-area:hover {
             border-color: #764ba2;
             background: #f0f2ff;
-        }
-        .upload-area.dragover {
-            background: #e8ebff;
-            border-color: #764ba2;
         }
         input[type="file"] {
             display: none;
@@ -99,19 +94,46 @@
         .results {
             margin-top: 30px;
         }
-        .result-item {
-            padding: 15px;
-            background: #f5f5f5;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        .result-item button {
-            width: auto;
-            padding: 10px 20px;
-            font-size: 1em;
+        .results-table th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        .results-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .results-table tr:hover {
+            background: #f5f5f5;
+        }
+        .header-frontpage {
+            color: #9c27b0;
+            font-weight: bold;
+        }
+        .header-gen {
+            color: #2196f3;
+            font-weight: bold;
+        }
+        .header-enr {
+            color: #ff9800;
+            font-weight: bold;
+        }
+        .header-ad {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .header-unknown {
+            color: #f44336;
+            font-weight: bold;
         }
         .spinner {
             display: inline-block;
@@ -129,31 +151,42 @@
 </head>
 <body>
     <div class="container">
-        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v5.0 Gemini</div>
-        <h1>JeppSRC</h1>
-        <p class="subtitle">AIP AMDT Document Splitter - ICAO Annex 15 Compliant</p>
+        <!-- WAŻNE: Za każdym razem gdy modyfikujesz ten plik HTML, ZAKTUALIZUJ numer wersji poniżej! -->
+        <div style="position: absolute; top: 10px; right: 10px; font-size: 0.75em; color: #7a8ba0; font-weight: 500;">v1.0 TEST</div>
+        <h1>JeppTEST</h1>
+        <p class="subtitle">Header Detection Test - Simple Page Analysis</p>
         
         <input type="hidden" id="apiKey" value="AIzaSyCR8xuBmxNo6znaGmGvKBXk9rZN-wwDOkk">
 
         <div class="upload-area" id="uploadArea">
-            <h3 style="color: #c9d1d9; font-weight: 500; margin-bottom: 10px;">Drag PDF here or click to select file</h3>
-            <p style="color: #7d8590; margin-top: 10px; font-size: 0.9em;">Supports AIP AMDT documents (PDF format)</p>
+            <h3 style="color: #667eea; font-weight: 500; margin-bottom: 10px;">Upload PDF to analyze headers</h3>
+            <p style="color: #7d8590; margin-top: 10px; font-size: 0.9em;">Click or drag PDF here</p>
             <input type="file" id="fileInput" accept=".pdf">
         </div>
 
-        <button id="processBtn" disabled>Load PDF file to begin</button>
+        <button id="analyzeBtn" disabled>Load PDF to begin</button>
 
         <div id="status"></div>
         <div id="results" class="results"></div>
     </div>
 
     <script>
-        const { PDFDocument } = PDFLib;
+        // Zapobiegaj otwieraniu PDF w przeglądarce
+        window.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }, false);
+        
+        window.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }, false);
+
         let selectedFile = null;
 
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
-        const processBtn = document.getElementById('processBtn');
+        const analyzeBtn = document.getElementById('analyzeBtn');
         const statusDiv = document.getElementById('status');
         const resultsDiv = document.getElementById('results');
         const apiKeyInput = document.getElementById('apiKey');
@@ -162,48 +195,44 @@
 
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadArea.classList.add('dragover');
+            e.stopPropagation();
+            uploadArea.style.background = '#e8ebff';
         });
 
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.style.background = '#f8f9ff';
         });
 
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            uploadArea.classList.remove('dragover');
+            e.stopPropagation();
+            uploadArea.style.background = '#f8f9ff';
             const file = e.dataTransfer.files[0];
             if (file && file.type === 'application/pdf') {
                 handleFile(file);
+            } else {
+                showStatus('error', 'Please upload a PDF file!');
             }
         });
 
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
-            if (file) {
-                handleFile(file);
-            }
+            if (file) handleFile(file);
         });
 
         function handleFile(file) {
             selectedFile = file;
-            
-            uploadArea.style.padding = '20px';
-            uploadArea.style.marginBottom = '20px';
-            uploadArea.innerHTML = \`
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <div>
-                        <div style="font-size: 1em; font-weight: 500; color: #4ade80;">✓ \${file.name}</div>
-                        <div style="color: #6b7280; font-size: 0.85em; margin-top: 4px;">\${(file.size / 1024 / 1024).toFixed(2)} MB</div>
-                    </div>
-                    <button onclick="location.reload()" style="width: auto; padding: 8px 16px; font-size: 0.85em; background: #374151; text-transform: none;">Change file</button>
-                </div>
-            \`;
-            processBtn.disabled = false;
-            processBtn.textContent = 'Process AMDT Document';
+            uploadArea.innerHTML = `
+                <div style="color: #4ade80; font-weight: 500;">✓ ${file.name}</div>
+                <div style="color: #6b7280; font-size: 0.85em; margin-top: 4px;">${(file.size / 1024 / 1024).toFixed(2)} MB</div>
+            `;
+            analyzeBtn.disabled = false;
+            analyzeBtn.textContent = 'Analyze Headers';
         }
 
-        processBtn.addEventListener('click', async () => {
+        analyzeBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
             const apiKey = apiKeyInput.value.trim();
@@ -212,17 +241,12 @@
                 return;
             }
 
-            processBtn.disabled = true;
-            processBtn.innerHTML = '<span class="spinner"></span> Processing...';
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '<span class="spinner"></span> Analyzing...';
             resultsDiv.innerHTML = '';
 
             try {
-                showStatus('info', 'Loading PDF document...');
-                const arrayBuffer = await selectedFile.arrayBuffer();
-                const pdfDoc = await PDFDocument.load(arrayBuffer);
-                const totalPages = pdfDoc.getPageCount();
-
-                showStatus('info', \`Analyzing document structure (\${totalPages} pages) with Gemini AI...\`);
+                showStatus('info', 'Converting PDF to base64...');
                 const pdfBytes = await selectedFile.arrayBuffer();
                 
                 const uint8Array = new Uint8Array(pdfBytes);
@@ -234,636 +258,61 @@
                 }
                 const base64 = btoa(binaryString);
                 
-                const analysisResult = await analyzeWithGemini(base64, apiKey);
-                const groups = analysisResult.groups || [];
-                const missingPages = analysisResult.missing_pages || [];
+                showStatus('info', 'Sending to Gemini AI for header analysis...');
+                const analysis = await analyzeHeaders(base64, apiKey);
                 
-                if (missingPages.length > 0) {
-                    groups.unshift({
-                        group_title: 'UNKNOWN',
-                        pages: missingPages,
-                        description: 'Unassigned pages',
-                        subsections: []
-                    });
-                    
-                    const warningDiv = document.createElement('div');
-                    warningDiv.className = 'status warning';
-                    warningDiv.innerHTML = \`<strong>⚠ WARNING:</strong> \${missingPages.length} pages were unassigned and grouped into UNKNOWN file: \${missingPages.join(', ')}\`;
-                    statusDiv.parentNode.insertBefore(warningDiv, statusDiv);
-                }
-
-                showStatus('info', \`Splitting document into \${groups.length} files...\`);
-                const results = [];
-
-                for (const group of groups) {
-                    const newPdf = await PDFDocument.create();
-                    
-                    for (const pageNum of group.pages) {
-                        const [copiedPage] = await newPdf.copyPages(pdfDoc, [pageNum - 1]);
-                        newPdf.addPage(copiedPage);
-                    }
-
-                    const pdfBytes = await newPdf.save();
-                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                    
-                    results.push({
-                        title: group.group_title,
-                        blob: blob,
-                        pages: group.pages.length,
-                        description: group.description || '',
-                        subsections: group.subsections || []
-                    });
-                }
-
-                showStatus('success', \`Complete! Document split into \${results.length} files.\`);
-                displayResults(results);
+                showStatus('success', `Analysis complete! Found ${analysis.pages.length} pages.`);
+                displayResults(analysis);
 
             } catch (error) {
                 showStatus('error', 'Error: ' + error.message);
                 console.error(error);
             } finally {
-                processBtn.disabled = false;
-                processBtn.textContent = 'Process another document';
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = 'Analyze another file';
             }
         });
 
-        async function analyzeWithGemini(base64Data, apiKey) {
-console.log('Base64 length:', base64Data.length);
-            
-            const prompt = `========================================
-JEPPSRC AIP AMDT ANALYZER - ALGORYTM
-========================================
+        async function analyzeHeaders(base64Data, apiKey) {
+            const prompt = `You are a PDF header analyzer for AIP AMDT documents.
 
-Jesteś analizatorem dokumentów AMDT (Amendment) dla AIP.
-Otrzymasz dokument PDF. Musisz go przeanalizować i zwrócić JSON.
+Your ONLY task: For EACH page in the PDF, identify the header text at the TOP of the page.
 
-KRYTYCZNE: ŻADNA strona nie może zostać pominięta!
+RULES:
+1. Look at the FIRST 1-3 lines of each page (the very top)
+2. Identify the header type:
+   - FRONT PAGE: if no GEN/ENR/AD header found (usually page 1-3)
+   - GEN X.Y: if you see "GEN" followed by numbers like "GEN 0.4", "GEN 3.2"
+   - ENR X.Y: if you see "ENR" followed by numbers like "ENR 1.3", "ENR 4.4"
+   - AD X.Y: if you see "AD" followed by numbers like "AD 0.6", "AD 2.12"
+   - UNKNOWN: if page is blank or unreadable
 
+3. For GEN/ENR/AD headers, extract EXACTLY what you see:
+   - "GEN 0.4-1" → return "GEN 0.4"
+   - "ENR 3.2-22" → return "ENR 3.2"
+   - "AD 2.12" → return "AD 2.12"
+   - Ignore anything after the dash
 
-════════════════════════════════════════
-KROK 1: ROZPOZNAJ KRAJ I PREFIKS ICAO
-════════════════════════════════════════
-
-1.1) Przeczytaj stronę 1 (FRONT PAGE)
-1.2) Znajdź nazwę kraju w tytule dokumentu
-     Przykłady: "ROMANIA AMDT 012/25", "POLAND AIP AMDT 03/2025"
-1.3) Określ prefiks ICAO na podstawie kraju i ZAPAMIĘTAJ GO:
-
-PEŁNA LISTA PREFIKSÓW ICAO:
-
-AG - Wyspy Salomona
-AN - Nauru
-AY - Papua Nowa Gwinea
-BI - Islandia
-BG - Grenlandia
-C - Kanada
-DA - Algieria
-DB - Benin
-DF - Burkina Faso
-DG - Ghana
-DI - Wybrzeże Kości Słoniowej
-DN - Nigeria
-DR - Niger
-DT - Tunezja
-DX - Togo
-EB - Belgia
-ED - Niemcy (Germany/Deutschland)
-EE - Estonia
-EF - Finlandia
-EG - Wielka Brytania (UK)
-EH - Holandia (Netherlands)
-EI - Irlandia
-EK - Dania
-EL - Luksemburg
-EN - Norwegia
-EP - Polska (Poland)
-ES - Szwecja
-ET - Litwa
-EV - Łotwa
-EY - Irlandia Północna
-FA - RPA (South Africa)
-FB - Botswana
-FC - Kongo
-FD - Suazi (Eswatini)
-FE - Republika Środkowoafrykańska
-FG - Gwinea Równikowa
-FH - Wyspa Wniebowstąpienia
-FI - Mauritius
-FJ - Brytyjskie Terytorium Oceanu Indyjskiego
-FK - Kamerun
-FL - Zambia
-FM - Komory, Madagaskar, Majotta, Reunion
-FN - Angola
-FO - Gabon
-FP - Wyspy Świętego Tomasza i Książęca
-FQ - Mozambik
-FS - Seszele
-FT - Czad
-FV - Zimbabwe
-FW - Malawi
-FX - Lesotho
-FY - Namibia
-FZ - Demokratyczna Republika Konga
-GA - Mali
-GB - Gambia
-GC - Hiszpańskie Wyspy Kanaryjskie
-GE - Hiszpańskie Ceuta i Melilla
-GF - Sierra Leone
-GG - Gwinea Bissau
-GL - Liberia
-GM - Maroko
-GO - Senegal
-GQ - Mauretania
-GS - Sahara Zachodnia
-GU - Gwinea
-GV - Wyspy Zielonego Przylądka
-HA - Etiopia
-HB - Burundi
-HC - Somalia
-HD - Dżibuti
-HE - Egipt
-HH - Erytrea
-HK - Kenia
-HL - Libia
-HR - Rwanda
-HS - Sudan
-HT - Tanzania
-HU - Uganda
-K - Stany Zjednoczone (USA)
-LA - Albania
-LB - Bułgaria
-LC - Cypr
-LD - Chorwacja
-LE - Hiszpania (Spain)
-LF - Francja (France)
-LG - Grecja
-LH - Węgry
-LI - Włochy (Italy)
-LJ - Słowenia
-LK - Czechy (Czech Republic)
-LL - Izrael
-LM - Malta
-LN - Monako
-LO - Austria
-LP - Portugalia
-LQ - Bośnia i Hercegowina
-LR - Rumunia (Romania/România)
-LS - Szwajcaria
-LT - Turcja
-LU - Mołdawia
-LV - Palestyna
-LW - Macedonia Północna
-LX - Gibraltar
-LY - Serbia, Czarnogóra
-LZ - Słowacja
-MB - Wyspy Turks i Caicos
-MD - Dominikana
-MG - Gwatemala
-MH - Honduras
-MK - Jamajka
-MM - Meksyk
-MN - Nikaragua
-MP - Panama
-MR - Kostaryka
-MS - Salwador
-MT - Haiti
-MU - Kuba
-MW - Kajmany
-MY - Bahamy
-MZ - Belize
-NC - Wyspy Cooka
-NF - Fidżi, Tonga
-NG - Kiribati, Tuvalu
-NI - Niue
-NS - Samoa
-NT - Polinezja Francuska
-NV - Vanuatu
-NW - Nowa Kaledonia
-NZ - Nowa Zelandia
-OA - Afganistan
-OB - Bahrajn
-OE - Arabia Saudyjska
-OI - Iran
-OJ - Jordania
-OK - Kuwejt
-OL - Liban
-OM - ZEA (UAE)
-OO - Oman
-OP - Pakistan
-OY - Jemen
-PA - Alaska
-PF - Wyspy Oceanu Spokojnego (US)
-PG - Guam, Mariany
-PH - Hawaje
-PJ - Johnston Atoll
-PK - Wyspy Marshalla
-PL - Kiribati (Linia)
-PM - Midway
-PT - Mikronezja, Palau
-PW - Wake Island
-RC - Tajwan
-RJ - Japonia
-RK - Korea Południowa
-RO - Okinawa
-RP - Filipiny
-SA - Argentyna
-SB - Brazylia
-SC - Chile
-SE - Ekwador
-SF - Falklandy
-SG - Paragwaj
-SK - Kolumbia
-SL - Boliwia
-SM - Surinam
-SO - Gujana Francuska
-SP - Peru
-SU - Urugwaj
-SV - Wenezuela
-SW - Gujana
-SY - Gujana
-TA - Antigua i Barbuda
-TB - Barbados
-TD - Dominika
-TF - Antyle Francuskie
-TG - Grenada
-TI - Wyspy Dziewicze (US)
-TJ - Puerto Rico
-TK - Saint Kitts i Nevis
-TL - Saint Lucia
-TN - Antyle Holenderskie (Aruba, Bonaire, Curaçao)
-TQ - Anguilla
-TR - Montserrat
-TT - Trynidad i Tobago
-TU - Brytyjskie Wyspy Dziewicze
-TV - Saint Vincent i Grenadyny
-UA - Kazachstan
-UB - Azerbejdżan
-UC - Kirgistan
-UD - Armenia
-UE - Rosja (Europa)
-UG - Gruzja
-UH - Rosja (Azja)
-UI - Rosja (Środkowa)
-UK - Ukraina
-UM - Białoruś
-UT - Tadżykistan
-UU - Rosja (Wschodnia)
-UW - Rosja (Zachodnia)
-VA - Indie
-VB - Hongkong (Chiny)
-VC - Sri Lanka
-VD - Kambodża
-VE - Indie
-VG - Bangladesz
-VH - Chiny
-VI - Indie
-VL - Laos
-VM - Makau
-VN - Nepal
-VO - Indie
-VQ - Bhutan
-VR - Malediwy
-VT - Tajlandia
-VV - Wietnam
-VY - Myanmar (Birma)
-WA - Indonezja
-WB - Brunei, Malezja
-WI - Indonezja
-WM - Malezja
-WP - Timor Wschodni
-WR - Indonezja
-WS - Singapur
-Y - Australia
-ZB - Chiny
-ZG - Chiny
-ZH - Chiny
-ZJ - Chiny
-ZK - Korea Północna
-ZL - Chiny
-ZM - Mongolia
-ZP - Chiny
-ZS - Chiny
-ZU - Chiny
-ZW - Chiny
-ZY - Chiny
-
-
-════════════════════════════════════════
-KROK 2: ANALIZA KAŻDEJ STRONY
-════════════════════════════════════════
-
-Dla każdej strony od 1 do końca dokumentu wykonaj:
-
-2.1) Przeczytaj treść strony
-2.2) Sprawdź górę strony (pierwsze 5-10 linijek)
-2.3) Określ TYP STRONY:
-
-     [A] FRONT PAGE - jeśli:
-         - To pierwsza strona LUB
-         - Poprzednie strony to FRONT PAGE I na tej NIE MA nagłówka GEN/ENR/AD
-     
-     [B] GEN X.Y - jeśli na górze strony jest:
-         "GEN" + spacja + cyfra + "." + cyfra
-         Przykład: "GEN 0.4", "GEN 3.2"
-     
-     [C] ENR X.Y - jeśli na górze strony jest:
-         "ENR" + spacja + cyfra + "." + cyfra
-         Przykład: "ENR 1.3", "ENR 4.4"
-     
-     [D] AD 0.Y lub AD 1.Y - jeśli na górze strony jest:
-         "AD" + spacja + "0." lub "AD" + spacja + "1."
-         Przykład: "AD 0.6", "AD 1.1"
-     
-     [E] AD 2.Y lub wyższe - jeśli na górze strony jest:
-         "AD" + spacja + cyfra ≥2 + "."
-         Przykład: "AD 2.12", "AD 2.14", "AD 3.5"
-
-2.4) Jeśli NIE MOŻESZ odczytać tekstu (strona rastrowa/obraz):
-     - Użyj OCR do przeczytania góry strony
-     - Powtórz krok 2.3
-
-2.5) Jeśli NADAL nie widzisz nagłówka GEN/ENR/AD:
-     - Przypisz do tej samej grupy co poprzednia strona
-
-
-════════════════════════════════════════
-KROK 3: GRUPOWANIE STRON
-════════════════════════════════════════
-
-3.1) FRONT PAGE:
-     - Grupuj wszystkie strony typu [A]
-     - Tytuł grupy: "FRONT PAGE"
-     - Nie ma drugiej kolumny (description: null)
-
-3.2) GEN, ENR, AD 0.x, AD 1.x (typy [B], [C], [D]):
-     
-     3.2.1) Wyciągnij NUMER SEKCJI z nagłówka:
-            - Czytaj od symbolu (GEN/ENR/AD)
-            - Bierz: pierwsza cyfra + kropka + druga cyfra
-            - IGNORUJ wszystko dalej (myślniki, kolejne cyfry, litery)
-            
-            Przykłady:
-            "GEN 0.4-1"     → numer sekcji: "GEN 0.4"
-            "GEN 0.4-6"     → numer sekcji: "GEN 0.4"  
-            "ENR 3.2-22"    → numer sekcji: "ENR 3.2"
-            "AD 1.1-5"      → numer sekcji: "AD 1.1"
-     
-     3.2.2) Grupuj strony z tym samym numerem sekcji
-     
-     3.2.3) Tytuł grupy = numer sekcji (np. "GEN 0.4", "ENR 3.2")
-
-3.3) AD 2.x i wyższe (typ [E]):
-     
-     3.3.1) Znajdź kod ICAO na stronie:
-            - Szukaj na górze strony (pierwsze 10 linijek)
-            - Kod ICAO = DOKŁADNIE 4 WIELKIE LITERY
-            - Pierwsze 2 litery = prefiks z KROKU 1
-            - Może być w nawiasie: "(LROP)" lub "(EPWA)"
-            - Może być między myślnikami: "— LRSV —"
-            - Wybierz ten który jest NAJWYŻEJ na stronie
-     
-     3.3.2) Jeśli NIE WIDZISZ kodu ICAO:
-            - Sprawdź OCRem (strona może być rastrowa)
-     
-     3.3.3) Jeśli NADAL nie ma kodu ICAO:
-            - Przypisz do tego samego ICAO co poprzednia strona
-     
-     3.3.4) Grupuj strony z tym samym kodem ICAO
-     
-     3.3.5) Tytuł grupy = kod ICAO (np. "LROP", "EPWA")
-
-
-════════════════════════════════════════
-KROK 4: WYPEŁNIENIE DRUGIEJ KOLUMNY
-════════════════════════════════════════
-
-Dla każdej grupy określ wartość pola "description":
-
-4.1) FRONT PAGE:
-     description = null
-
-4.2) Grupy GEN, ENR, AD 0.x, AD 1.x:
-     
-     4.2.1) Znajdź nagłówek na pierwszej stronie grupy
-            - Szukaj w pierwszych 20 linijkach
-            - Nagłówek to opis sekcji po numerze
-            
-            Przykład:
-            Strona: "GEN 0.4 Checklist of AIP pages"
-            → description = "Checklist of AIP pages"
-     
-     4.2.2) Jeśli nie widzisz nagłówka:
-            - Sprawdź OCRem
-     
-     4.2.3) Jeśli nadal nie ma nagłówka:
-            - Użyj standardowego tytułu z ICAO Annex 15
-            - Zobacz LISTA TYTUŁÓW SEKCJI poniżej
-
-4.3) Grupy AD 2.x (ICAO):
-     description = null
-     (zamiast tego używamy pola "subsections")
-
-
-LISTA TYTUŁÓW SEKCJI (ICAO Annex 15):
-
-GEN 0.1 = "Preface"
-GEN 0.2 = "Record of AIP Amendments"
-GEN 0.3 = "Record of AIP Supplements"
-GEN 0.4 = "Checklist of AIP pages"
-GEN 0.5 = "List of hand amendments to the AIP"
-GEN 0.6 = "Table of contents to Part 1"
-GEN 1.1 = "Designated authorities"
-GEN 1.2 = "Entry, transit and departure of aircraft"
-GEN 1.3 = "Entry, transit and departure of passengers and crew"
-GEN 1.4 = "Entry, transit and departure of cargo"
-GEN 1.5 = "Aircraft instruments, equipment and flight documents"
-GEN 1.6 = "Summary of national regulations and international agreements/conventions"
-GEN 1.7 = "Differences from ICAO Standards, Recommended Practices and Procedures"
-GEN 2.1 = "Measuring system, aircraft markings, holidays"
-GEN 2.2 = "Abbreviations used in AIS publications"
-GEN 2.3 = "Chart symbols"
-GEN 2.4 = "Location indicators"
-GEN 2.5 = "List of radio navigation aids"
-GEN 2.6 = "Conversion tables"
-GEN 2.7 = "Sunrise/sunset tables"
-GEN 3.1 = "Aeronautical information services"
-GEN 3.2 = "Aeronautical charts"
-GEN 3.3 = "Air traffic services"
-GEN 3.4 = "Communication services"
-GEN 3.5 = "Meteorological services"
-GEN 3.6 = "Search and rescue"
-GEN 4.1 = "Aerodrome/heliport charges"
-GEN 4.2 = "Air navigation services charges"
-
-ENR 0.6 = "Table of contents to Part 2"
-ENR 1.1 = "General rules"
-ENR 1.2 = "Visual flight rules"
-ENR 1.3 = "Instrument flight rules"
-ENR 1.4 = "ATS airspace classification"
-ENR 1.5 = "Holding, approach and departure procedures"
-ENR 1.6 = "ATS surveillance services and procedures"
-ENR 1.7 = "Altimeter setting procedures"
-ENR 1.8 = "Regional supplementary procedures"
-ENR 1.9 = "Air traffic flow management"
-ENR 1.10 = "Flight planning"
-ENR 1.11 = "Addressing of flight plan messages"
-ENR 1.12 = "Interception of civil aircraft"
-ENR 1.13 = "Unlawful interference"
-ENR 1.14 = "Air traffic incidents"
-ENR 2.1 = "FIR, UIR, TMA"
-ENR 2.2 = "Other regulated airspace"
-ENR 3.1 = "Lower ATS routes"
-ENR 3.2 = "Upper ATS routes"
-ENR 3.3 = "Area navigation routes"
-ENR 3.4 = "Helicopter routes"
-ENR 3.5 = "Other routes"
-ENR 3.6 = "En-route holding"
-ENR 4.1 = "Radio navigation aids — en-route"
-ENR 4.2 = "Special navigation systems"
-ENR 4.3 = "Global navigation satellite system (GNSS)"
-ENR 4.4 = "Name-code designators for significant points"
-ENR 4.5 = "Aeronautical ground lights — en-route"
-ENR 5.1 = "Prohibited, restricted and danger areas"
-ENR 5.2 = "Military exercise and training areas and air defence identification zone (ADIZ)"
-ENR 5.3 = "Other activities of a dangerous nature and other potential hazards"
-ENR 5.4 = "Air navigation obstacles"
-ENR 5.5 = "Aerial sporting and recreational activities"
-ENR 5.6 = "Bird migration and areas with sensitive fauna"
-ENR 6.x = "En-route charts" (wszystkie podsekcje ENR 6)
-
-AD 0.6 = "Table of contents to Part 3"
-AD 1.1 = "Aerodrome/heliport availability"
-AD 1.2 = "Rescue and firefighting services and snow plan"
-AD 1.3 = "Index to aerodromes and heliports"
-AD 1.4 = "Grouping of aerodromes/heliports"
-AD 1.5 = "Status of certification of aerodromes"
-
-AD 2.1 = "Aerodrome location indicator and name"
-AD 2.2 = "Aerodrome geographical and administrative data"
-AD 2.3 = "Operational hours"
-AD 2.4 = "Handling services and facilities"
-AD 2.5 = "Passenger facilities"
-AD 2.6 = "Rescue and firefighting services"
-AD 2.7 = "Seasonal availability — clearing"
-AD 2.8 = "Aprons, taxiways and check locations/positions data"
-AD 2.9 = "Surface movement guidance and control system and markings"
-AD 2.10 = "Aerodrome obstacles"
-AD 2.11 = "Meteorological information provided"
-AD 2.12 = "Runway physical characteristics"
-AD 2.13 = "Declared distances"
-AD 2.14 = "Approach and runway lighting"
-AD 2.15 = "Other lighting, secondary power supply"
-AD 2.16 = "Helicopter landing area"
-AD 2.17 = "Air traffic services airspace"
-AD 2.18 = "Air traffic services communication facilities"
-AD 2.19 = "Radio navigation and landing aids"
-AD 2.20 = "Local traffic regulations"
-AD 2.21 = "Noise abatement procedures"
-AD 2.22 = "Flight procedures"
-AD 2.23 = "Additional information"
-AD 2.24 = "Charts related to an aerodrome"
-
-AD 3.1 = "Heliport location indicator and name"
-AD 3.2 = "Heliport geographical and administrative data"
-AD 3.3 = "Operational hours"
-AD 3.4 = "Handling services and facilities"
-AD 3.5 = "Passenger facilities"
-AD 3.6 = "Rescue and firefighting services"
-AD 3.7 = "Seasonal availability — clearing"
-AD 3.8 = "Aprons, taxiways and check locations/positions data"
-AD 3.9 = "Markings and markers"
-AD 3.10 = "Heliport obstacles"
-AD 3.11 = "Meteorological information provided"
-AD 3.12 = "Heliport data"
-AD 3.13 = "Declared distances"
-AD 3.14 = "Approach and FATO lighting"
-AD 3.15 = "Other lighting, secondary power supply"
-AD 3.16 = "Air traffic services airspace"
-AD 3.17 = "Air traffic services communication facilities"
-AD 3.18 = "Radio navigation and landing aids"
-AD 3.19 = "Local traffic regulations"
-AD 3.20 = "Noise abatement procedures"
-AD 3.21 = "Flight procedures"
-AD 3.22 = "Additional information"
-AD 3.23 = "Charts related to a heliport"
-
-
-════════════════════════════════════════
-KROK 5: WYKRYWANIE PODSEKCJI AD 2.x
-════════════════════════════════════════
-
-TYLKO dla grup AD 2.x (ICAO):
-
-5.1) Przeanalizuj KAŻDĄ stronę w grupie
-
-5.2) Na każdej stronie szukaj nagłówków podsekcji:
-     - Format: [KOD_ICAO] + "AD 2." + cyfra
-     - Przykłady: "LROP AD 2.12", "EPWA AD 2.3"
-     - Nagłówek może być w DOWOLNYM miejscu strony
-     - Nagłówek jest PO symbolu ICAO
-
-5.3) Wykryj podsekcje od AD 2.1 do AD 2.18:
-     - Wypisz wszystkie które znalazłeś
-     - IGNORUJ AD 2.19 i wyższe (AD 2.20, AD 2.21, ...)
-
-5.4) SPECJALNA ZASADA - podsekcje "ukryte":
-     Jeśli na stronie:
-     - Jest treść (tekst, tabela, grafika) BEZ nagłówka
-     - Powyżej tej treści jest nagłówek innej podsekcji
-     - A wcześniej była inna podsekcja z mniejszym numerem
-     
-     To DOPISZ wszystkie brakujące podsekcje między nimi!
-     
-     Przykład:
-     Strona 1: "LROP AD 2.17" (widzę nagłówek)
-     Strona 2: jest jakaś tabelka bez nagłówka, a potem "LROP AD 2.19"
-     → Dopisz: AD 2.18 (bo jest między 2.17 a 2.19)
-
-5.5) Zwróć listę w polu "subsections"
-     Przykład: ["AD 2.1", "AD 2.12", "AD 2.14", "AD 2.18"]
-
-
-════════════════════════════════════════
-KROK 6: WYGENERUJ JSON
-════════════════════════════════════════
-
-Zwróć JSON w formacie:
-
+Return ONLY valid JSON in this format:
 {
-  "doc_title": "ROMANIA AMDT 012/25",
-  "country": "ROMANIA", 
-  "icao_prefix": "LR",
   "total_pages": 45,
-  "groups": [
-    {
-      "group_title": "FRONT PAGE",
-      "pages": [1, 2, 3],
-      "description": null,
-      "subsections": []
-    },
-    {
-      "group_title": "GEN 0.4",
-      "pages": [4, 5, 6],
-      "description": "Checklist of AIP pages",
-      "subsections": []
-    },
-    {
-      "group_title": "LROP",
-      "pages": [20, 21, 22],
-      "description": null,
-      "subsections": ["AD 2.1", "AD 2.12", "AD 2.14"]
-    }
+  "pages": [
+    {"page": 1, "header": "FRONT PAGE"},
+    {"page": 2, "header": "FRONT PAGE"},
+    {"page": 3, "header": "GEN 0.2"},
+    {"page": 4, "header": "GEN 0.2"},
+    {"page": 5, "header": "GEN 0.4"},
+    {"page": 6, "header": "ENR 1.3"}
   ]
 }
 
-UWAGI:
-- Wszystkie strony muszą być na liście!
-- Pole "pages" = lista numerów stron
-- Dla FRONT PAGE: description = null, subsections = []
-- Dla GEN/ENR/AD 0-1: description = nazwa, subsections = []
-- Dla AD 2.x (ICAO): description = null, subsections = [lista]
+IMPORTANT: 
+- Include ALL pages from 1 to total_pages
+- Look ONLY at the top of each page
+- If the text is in an image/scan, use OCR to read it
+- Return pure JSON, no markdown, no explanation
 
-Na końcu dodaj: __END__`;
+END your response with: __END__`;
 
             for (let attempt = 1; attempt <= 3; attempt++) {
                 try {
@@ -917,24 +366,11 @@ Na końcu dodaj: __END__`;
 
                     const parsed = JSON.parse(jsonMatch[0]);
                     
-                    const totalPages = parsed.total_pages || 0;
-                    const assignedPages = new Set();
-                    for (const group of (parsed.groups || [])) {
-                        for (const page of (group.pages || [])) {
-                            assignedPages.add(page);
-                        }
+                    if (!parsed.pages || !Array.isArray(parsed.pages)) {
+                        throw new Error('Invalid response format');
                     }
                     
-                    if (totalPages > 0 && assignedPages.size < totalPages) {
-                        const missing = [];
-                        for (let i = 1; i <= totalPages; i++) {
-                            if (!assignedPages.has(i)) missing.push(i);
-                        }
-                        console.warn('WARNING: Some pages not assigned:', missing);
-                        return { groups: parsed.groups || [], missing_pages: missing };
-                    }
-                    
-                    return { groups: parsed.groups || [], missing_pages: [] };
+                    return parsed;
                     
                 } catch (error) {
                     if (attempt === 3) throw error;
@@ -949,42 +385,48 @@ Na końcu dodaj: __END__`;
             statusDiv.textContent = message;
         }
 
-        function displayResults(results) {
-            resultsDiv.innerHTML = '<h3 style="margin-bottom: 20px; color: #c9d1d9; font-weight: 500; font-size: 1.1em;">Download split files:</h3>';
+        function displayResults(analysis) {
+            const pages = analysis.pages || [];
             
-            results.forEach((result, index) => {
-                const div = document.createElement('div');
-                div.className = 'result-item';
+            let html = '<h3 style="margin-bottom: 15px; color: #667eea;">Header Analysis Results:</h3>';
+            html += '<table class="results-table">';
+            html += '<thead><tr><th style="width: 100px;">Page</th><th>Detected Header</th></tr></thead>';
+            html += '<tbody>';
+            
+            pages.forEach(p => {
+                const header = p.header || 'UNKNOWN';
+                let headerClass = 'header-unknown';
                 
-                let middleColumn;
-                if (result.subsections && result.subsections.length > 0) {
-                    middleColumn = `<div class="result-subsections">${result.subsections.join(', ')}</div>`;
-                } else if (result.description) {
-                    middleColumn = `<div class="result-subsections">${result.description}</div>`;
-                } else {
-                    middleColumn = `<div class="result-subsections">—</div>`;
-                }
+                if (header === 'FRONT PAGE') headerClass = 'header-frontpage';
+                else if (header.startsWith('GEN')) headerClass = 'header-gen';
+                else if (header.startsWith('ENR')) headerClass = 'header-enr';
+                else if (header.startsWith('AD')) headerClass = 'header-ad';
                 
-                div.innerHTML = `
-                    <div class="result-title">${result.title}</div>
-                    ${middleColumn}
-                    <button onclick="downloadPDF(${index})">Download PDF</button>
-                `;
-                resultsDiv.appendChild(div);
+                html += `<tr>
+                    <td>${p.page}</td>
+                    <td class="${headerClass}">${header}</td>
+                </tr>`;
             });
-
-            window.pdfResults = results;
+            
+            html += '</tbody></table>';
+            
+            // Summary
+            const summary = {};
+            pages.forEach(p => {
+                const h = p.header || 'UNKNOWN';
+                summary[h] = (summary[h] || 0) + 1;
+            });
+            
+            html += '<div style="margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 10px;">';
+            html += '<h4 style="margin-bottom: 10px; color: #667eea;">Summary:</h4>';
+            html += '<div style="font-family: monospace; font-size: 0.9em;">';
+            Object.keys(summary).sort().forEach(key => {
+                html += `<div>${key}: <strong>${summary[key]} pages</strong></div>`;
+            });
+            html += '</div></div>';
+            
+            resultsDiv.innerHTML = html;
         }
-
-        window.downloadPDF = function(index) {
-            const result = window.pdfResults[index];
-            const url = URL.createObjectURL(result.blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${result.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
-            a.click();
-            URL.revokeObjectURL(url);
-        };
     </script>
 </body>
 </html>
