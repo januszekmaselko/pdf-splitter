@@ -279,7 +279,7 @@
 <body>
     <div class="container">
         <h1>📄 JeppTEST4 - Regex Header Detection</h1>
-        <p class="subtitle">100% niezawodne wykrywanie nagłówków bez AI • Tylko regex + pdf.js • <strong>v1.3</strong></p>
+        <p class="subtitle">100% niezawodne wykrywanie nagłówków bez AI • Tylko regex + pdf.js • <strong>v1.4</strong></p>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📁</div>
@@ -413,15 +413,14 @@
                 return { section: 'FRONT PAGE', header: 'Page 1' };
             }
             
-            // KRYTYCZNA ZASADA 2: TYLKO GÓRNA CZĘŚĆ STRONY!
-            // Bierzemy pierwsze 50 znaków (tam jest nagłówek)
-            const firstLine = text.substring(0, 50).replace(/\s+/g, ' ').trim();
+            // KRYTYCZNA ZASADA 2: BIERZEMY PIERWSZY WYKRYTY NAGŁÓWEK OD GÓRY!
+            // Regex automatycznie znajdzie pierwszy match = od góry strony
+            // Nie limitujemy znaków - regex szuka w całym tekście ale zwraca pierwszy
             
-            // KRYTYCZNA ZASADA 3: BIERZEMY PIERWSZY WYKRYTY NAGŁÓWEK!
-            // Sprawdzamy w kolejności: GEN -> ENR -> AD -> ICAO
+            const cleanText = text.replace(/\s+/g, ' ').trim();
             
             // 2. GEN X.Y (PIERWSZY od góry!)
-            const genMatch = firstLine.match(/\bGEN\s+(\d+)\.(\d+)/i);
+            const genMatch = cleanText.match(/\bGEN\s+(\d+)\.(\d+)/i);
             if (genMatch) {
                 return { 
                     section: 'GEN', 
@@ -430,7 +429,7 @@
             }
             
             // 3. ENR X.Y (PIERWSZY od góry!)
-            const enrMatch = firstLine.match(/\bENR\s+(\d+)\.(\d+)/i);
+            const enrMatch = cleanText.match(/\bENR\s+(\d+)\.(\d+)/i);
             if (enrMatch) {
                 return { 
                     section: 'ENR', 
@@ -439,7 +438,7 @@
             }
             
             // 4. AD X.Y (PIERWSZY od góry!)
-            const adMatch = firstLine.match(/\bAD\s+(\d+)\.(\d+)/i);
+            const adMatch = cleanText.match(/\bAD\s+(\d+)\.(\d+)/i);
             if (adMatch) {
                 return { 
                     section: 'AD', 
@@ -449,7 +448,7 @@
             
             // 5. ICAO code (4 litery) + AD (PIERWSZY od góry!)
             // Wzorce: "LBSP AD", "EYKA AD 2.24", "AD 2 EYKA"
-            const icaoBeforeMatch = firstLine.match(/\b([A-Z]{4})\s+AD\s+/i);
+            const icaoBeforeMatch = cleanText.match(/\b([A-Z]{4})\s+AD\s+/i);
             if (icaoBeforeMatch) {
                 return { 
                     section: 'ICAO', 
@@ -457,7 +456,7 @@
                 };
             }
             
-            const icaoAfterMatch = firstLine.match(/\bAD\s+\d+\s+([A-Z]{4})/i);
+            const icaoAfterMatch = cleanText.match(/\bAD\s+\d+\s+([A-Z]{4})/i);
             if (icaoAfterMatch) {
                 return { 
                     section: 'ICAO', 
