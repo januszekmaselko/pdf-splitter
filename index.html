@@ -278,7 +278,7 @@
 <body>
     <div class="container">
         <h1>📄 JeppTEST4 - Regex Header Detection</h1>
-        <p class="subtitle">100% niezawodne wykrywanie nagłówków bez AI • Tylko regex + pdf.js • <strong>v1.5 DEBUG</strong></p>
+        <p class="subtitle">100% niezawodne wykrywanie nagłówków bez AI • Tylko regex + pdf.js • <strong>v1.6 - SORTED BY Y</strong></p>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📁</div>
@@ -378,8 +378,13 @@
                     const page = await pdf.getPage(pageNum);
                     const textContent = await page.getTextContent();
                     
-                    // Wyciągnij tekst
-                    const text = textContent.items.map(item => item.str).join(' ');
+                    // KRYTYCZNE: Sortuj według pozycji Y (od góry = większy Y)
+                    const sortedItems = textContent.items.sort((a, b) => {
+                        return b.transform[5] - a.transform[5]; // Y od góry do dołu
+                    });
+                    
+                    // Wyciągnij tekst (już posortowany od góry)
+                    const text = sortedItems.map(item => item.str).join(' ');
                     
                     // Wykryj sekcję
                     const detection = detectSection(text, pageNum);
