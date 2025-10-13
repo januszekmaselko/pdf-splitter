@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JeppTEST5 FIXED v2 - PDF Section Detector</title>
+    <title>JeppTEST7 v1.0 - JSON Section Detector</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         * {
@@ -26,6 +26,18 @@
             border-radius: 15px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             padding: 30px;
+        }
+        
+        .version-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ff6b6b;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
         }
         
         h1 {
@@ -251,15 +263,47 @@
             font-family: monospace;
             white-space: pre-wrap;
         }
+
+        .info-badge {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .info-badge h3 {
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .info-badge p {
+            color: #856404;
+            font-size: 13px;
+            line-height: 1.6;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📄 JeppTEST5 FIXED v2 - PDF Section Detector</h1>
-        <p class="subtitle">PDF → HTML z pozycjami → czytanie od góry • <strong>v2.4 - FRONT PAGE tylko na początku + regex AD2.8</strong></p>
+        <div class="version-badge">v1.0 JSON</div>
+        <h1>🔍 JeppTEST7</h1>
+        <p class="subtitle">PDF Section Detector • <strong>ANALIZA JSON zamiast HTML • Gotowe na Tesseract OCR</strong></p>
+        
+        <div class="info-badge">
+            <h3>📋 Jak działa nowy algorytm JSON:</h3>
+            <p>
+                <strong>1.</strong> PDF → JSON z pozycjami (X, Y) każdego tekstu<br>
+                <strong>2.</strong> Sortowanie JSON od góry do dołu strony (Y DESC, potem X ASC)<br>
+                <strong>3.</strong> Czytanie tekstu jak człowiek (linia po linii)<br>
+                <strong>4.</strong> Wykrywanie sekcji GEN/ENR/AD → jeśli AD 2.x+ → szukaj ICAO<br>
+                <strong>5.</strong> Gotowe do podpięcia Tesseract OCR dla stron rastrowych
+            </p>
+        </div>
         
         <div class="upload-area" id="uploadArea">
-            <div class="upload-icon">📁</div>
+            <div class="upload-icon">📄</div>
             <h2>Przeciągnij PDF tutaj lub kliknij aby wybrać plik</h2>
             <p>Dokumenty AIP AMDT (Lithuania, Bulgaria, Romania...)</p>
             <input type="file" id="fileInput" accept=".pdf">
@@ -285,7 +329,7 @@
                         <th>Nr strony</th>
                         <th>Sekcja</th>
                         <th>Wykryty nagłówek</th>
-                        <th>Pierwsze 200 znaków (HTML→TEXT od góry)</th>
+                        <th>Pierwsze 200 znaków (z JSON)</th>
                     </tr>
                 </thead>
                 <tbody id="resultsTable"></tbody>
@@ -338,41 +382,40 @@
                 progressFill.textContent = '10%';
 
                 const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 const totalPages = pdf.numPages;
 
-                status.textContent = `Analizuję ${totalPages} stron...`;
+                status.textContent = `Analizuję ${totalPages} stron z JSON...`;
 
                 const results = [];
 
-                // Przetwarzaj każdą stronę
+                // ETAP 1: Dla każdej strony wykryj sekcję z JSON
                 for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
                     const progress = 10 + (pageNum / totalPages * 80);
                     progressFill.style.width = progress + '%';
                     progressFill.textContent = Math.round(progress) + '%';
-                    status.textContent = `Analizuję stronę ${pageNum}/${totalPages}...`;
+                    status.textContent = `Analizuję stronę ${pageNum}/${totalPages} (JSON)...`;
 
                     const page = await pdf.getPage(pageNum);
                     const textContent = await page.getTextContent();
                     
-                    // KRYTYCZNE: Wyciągnij tekst z PDF (już posortowany)
-                    const cleanText = await convertToHTML(textContent);
+                    // KRYTYCZNE: Konwertuj na JSON
+                    const jsonData = convertToJSON(textContent);
                     
-                    // Wykryj sekcję (przekaż poprzednią sekcję)
-                    const previousSection = results.length > 0 ? results[results.length - 1].section : null;
-                    const detection = detectSection(cleanText, pageNum, previousSection);
+                    // ETAP 1: Wykryj sekcję
+                    const detection = detectSectionFromJSON(jsonData, pageNum);
                     
                     results.push({
                         page: pageNum,
                         section: detection.section,
                         header: detection.header,
-                        textPreview: cleanText.substring(0, 200)
+                        textPreview: detection.textPreview
                     });
                 }
 
                 progressFill.style.width = '100%';
                 progressFill.textContent = '100%';
-                status.textContent = 'Gotowe!';
+                status.textContent = 'Gotowe! (JSON analysis)';
 
                 displayResults(results);
 
@@ -382,128 +425,174 @@
             }
         }
 
-        // KONWERSJA PDF → TEXT (sortowany według Y od góry do dołu)
-        async function convertToHTML(textContent) {
-            // Sortuj elementy według Y (od góry = większy Y)
-            const sortedItems = textContent.items.sort((a, b) => {
-                const yDiff = Math.abs(b.transform[5] - a.transform[5]);
-                // Jeśli Y jest podobne (różnica < 5px) = ta sama linia
-                if (yDiff < 5) {
-                    // Sortuj po X (lewo → prawo)
-                    return a.transform[4] - b.transform[4];
+        // KONWERSJA PDF → JSON
+        function convertToJSON(textContent) {
+            const items = textContent.items.map(item => ({
+                text: item.str,
+                x: Math.round(item.transform[4]),
+                y: Math.round(item.transform[5]),
+                width: Math.round(item.width || 0),
+                height: Math.round(item.height || 0)
+            }));
+            
+            // Sortuj JSON: Y od góry (DESC), potem X od lewej (ASC)
+            items.sort((a, b) => {
+                const yDiff = Math.abs(b.y - a.y);
+                if (yDiff < 5) { // Ta sama linia
+                    return a.x - b.x;
                 }
-                // Inaczej sortuj po Y (góra → dół)
-                return b.transform[5] - a.transform[5];
+                return b.y - a.y; // Od góry do dołu
             });
             
-            // Złóż tekst bezpośrednio z item.str
-            let text = '';
-            sortedItems.forEach(item => {
-                if (item.str && item.str.trim()) {
-                    text += item.str + ' ';
-                }
-            });
-            
-            return text.trim();
+            return items;
         }
 
-        // FUNKCJA WYKRYWAJĄCA SEKCJĘ - NAJNOWSZA WERSJA
-        function detectSection(text, pageNum, previousSection) {
-            // ============================================
-            // ZASADA 1: FRONT PAGE tylko na początku
-            // ============================================
+        // WYKRYJ SEKCJĘ Z JSON
+        function detectSectionFromJSON(jsonData, pageNum) {
+            // Złóż tekst z JSON (od góry do dołu)
+            let fullText = '';
+            let topText = '';
+            let bottomText = '';
             
-            // Strona 1 = ZAWSZE FRONT PAGE
+            if (jsonData.length === 0) {
+                return { 
+                    section: 'UNKNOWN', 
+                    header: 'Empty page', 
+                    textPreview: '' 
+                };
+            }
+            
+            const maxY = jsonData[0].y;
+            const minY = jsonData[jsonData.length - 1].y;
+            
+            jsonData.forEach(item => {
+                if (item.text && item.text.trim()) {
+                    fullText += item.text + ' ';
+                    
+                    // Górne 100px
+                    if (maxY - item.y <= 100) {
+                        topText += item.text + ' ';
+                    }
+                    
+                    // Dolne 100px
+                    if (item.y - minY <= 100) {
+                        bottomText += item.text + ' ';
+                    }
+                }
+            });
+            
+            fullText = fullText.trim();
+            topText = topText.trim();
+            bottomText = bottomText.trim();
+            
+            // STRONA 1 = FRONT PAGE
             if (pageNum === 1) {
-                return { section: 'FRONT PAGE', header: 'Page 1' };
+                return { 
+                    section: 'FRONT PAGE', 
+                    header: 'Page 1',
+                    textPreview: fullText.substring(0, 200)
+                };
             }
             
-            // WAŻNE: FRONT PAGE może być tylko jeśli poprzednia strona była FRONT PAGE
-            // (czyli ciąg FRONT PAGE na początku dokumentu: 1, 2, 3...)
-            const topText = text.substring(0, 100).toUpperCase();
-            if (topText.includes('AMDT') && previousSection === 'FRONT PAGE') {
-                return { section: 'FRONT PAGE', header: `Page ${pageNum} (AMDT)` };
-            }
-            
-            // ============================================
-            // ZASADA 2: Szukaj nagłówków sekcji
-            // ============================================
-            
-            // Znajdź wszystkie nagłówki i wybierz pierwszy
-            const matches = [];
-            
-            // ✅ GEN X.Y (ze spacją lub bez)
-            let genMatch = text.match(/\bGEN\s*(\d+)\.(\d+)/i);
-            if (genMatch) {
-                matches.push({
-                    index: text.indexOf(genMatch[0]),
-                    section: 'GEN',
-                    header: `GEN ${genMatch[1]}.${genMatch[2]}`
-                });
-            }
-            
-            // ✅ ENR X.Y (ze spacją lub bez)
-            let enrMatch = text.match(/\bENR\s*(\d+)\.(\d+)/i);
-            if (enrMatch) {
-                matches.push({
-                    index: text.indexOf(enrMatch[0]),
-                    section: 'ENR',
-                    header: `ENR ${enrMatch[1]}.${enrMatch[2]}`
-                });
-            }
-            
-            // ✅ AD X.Y - dwa wzorce:
-            // 1) AD 2.5 (spacja między AD i cyfrą)
-            let adMatch = text.match(/\bAD\s*(\d+)\.(\d+)/i);
-            if (adMatch) {
-                matches.push({
-                    index: text.indexOf(adMatch[0]),
-                    section: 'AD',
-                    header: `AD ${adMatch[1]}.${adMatch[2]}`
-                });
-            }
-            
-            // 2) AD2 .8 lub AD2.8 (cyfra przyklejona do AD)
-            if (!adMatch) {
-                let adMatch2 = text.match(/\bAD(\d+)\s*\.(\d+)/i);
-                if (adMatch2) {
-                    matches.push({
-                        index: text.indexOf(adMatch2[0]),
-                        section: 'AD',
-                        header: `AD ${adMatch2[1]}.${adMatch2[2]}`
-                    });
+            // STRONY 2-5 bez nagłówków = FRONT PAGE
+            if (pageNum <= 5) {
+                const hasHeaders = checkForHeaders(topText) || checkForHeaders(bottomText);
+                if (!hasHeaders) {
+                    return { 
+                        section: 'FRONT PAGE', 
+                        header: `Page ${pageNum} (no headers)`,
+                        textPreview: fullText.substring(0, 200)
+                    };
                 }
             }
             
-            // Szukaj ICAO + AD
+            // Szukaj sekcji
+            const textToSearch = topText + ' ' + bottomText + ' ' + fullText;
+            
+            // GEN X.Y
+            let genMatch = textToSearch.match(/\bGEN\s*(\d+)\s*\.\s*(\d+)/i);
+            if (genMatch) {
+                return { 
+                    section: 'GEN', 
+                    header: `GEN ${genMatch[1]}.${genMatch[2]}`,
+                    textPreview: fullText.substring(0, 200)
+                };
+            }
+            
+            // ENR X.Y
+            let enrMatch = textToSearch.match(/\bENR\s*(\d+)\s*\.\s*(\d+)/i);
+            if (enrMatch) {
+                return { 
+                    section: 'ENR', 
+                    header: `ENR ${enrMatch[1]}.${enrMatch[2]}`,
+                    textPreview: fullText.substring(0, 200)
+                };
+            }
+            
+            // AD X.Y
+            let adMatch = textToSearch.match(/\bAD\s*(\d+)\s*\.\s*(\d+)/i);
+            if (adMatch) {
+                const majorNum = parseInt(adMatch[1]);
+                
+                // Jeśli AD 2.x lub wyższe → szukaj ICAO
+                if (majorNum >= 2) {
+                    const icao = findICAO(textToSearch);
+                    if (icao) {
+                        return { 
+                            section: 'ICAO', 
+                            header: icao,
+                            textPreview: fullText.substring(0, 200)
+                        };
+                    }
+                }
+                
+                return { 
+                    section: 'AD', 
+                    header: `AD ${adMatch[1]}.${adMatch[2]}`,
+                    textPreview: fullText.substring(0, 200)
+                };
+            }
+            
+            // UNKNOWN
+            return { 
+                section: 'UNKNOWN', 
+                header: '-',
+                textPreview: fullText.substring(0, 200)
+            };
+        }
+
+        // ZNAJDŹ ICAO (dla AD 2.x+)
+        function findICAO(text) {
+            // Priorytet 1: ICAO w nawiasach
+            const icaoParenMatch = text.match(/\(([A-Z]{4})\)/);
+            if (icaoParenMatch) {
+                return icaoParenMatch[1];
+            }
+            
+            // Priorytet 2: ICAO przed AD
             const icaoBeforeMatch = text.match(/\b([A-Z]{4})\s+AD\s+/i);
             if (icaoBeforeMatch) {
-                matches.push({
-                    index: text.indexOf(icaoBeforeMatch[0]),
-                    section: 'ICAO',
-                    header: icaoBeforeMatch[1]
-                });
+                return icaoBeforeMatch[1];
             }
             
+            // Priorytet 3: ICAO po AD
             const icaoAfterMatch = text.match(/\bAD\s+\d+\s+([A-Z]{4})/i);
             if (icaoAfterMatch) {
-                matches.push({
-                    index: text.indexOf(icaoAfterMatch[0]),
-                    section: 'ICAO',
-                    header: icaoAfterMatch[1]
-                });
+                return icaoAfterMatch[1];
             }
             
-            // WYBIERZ PIERWSZY (najmniejszy index)
-            if (matches.length > 0) {
-                matches.sort((a, b) => a.index - b.index);
-                return matches[0];
-            }
+            return null;
+        }
+
+        // Sprawdź czy są nagłówki
+        function checkForHeaders(text) {
+            if (!text) return false;
             
-            // ============================================
-            // ZASADA 3: Jeśli nic nie znaleziono = UNKNOWN
-            // ============================================
-            return { section: 'UNKNOWN', header: '-' };
+            const hasGEN = /\bGEN\s*\d+\s*\.\s*\d+/i.test(text);
+            const hasENR = /\bENR\s*\d+\s*\.\s*\d+/i.test(text);
+            const hasAD = /\bAD\s*\d+\s*\.\s*\d+/i.test(text);
+            
+            return hasGEN || hasENR || hasAD;
         }
 
         // WYŚWIETL WYNIKI
@@ -516,7 +605,7 @@
                     <td>${r.page}</td>
                     <td><span class="section-${r.section}">${r.section}</span></td>
                     <td>${r.header}</td>
-                    <td class="text-preview">${r.textPreview}</td>
+                    <td class="text-preview">${r.textPreview || ''}</td>
                 `;
                 resultsTable.appendChild(row);
             });
